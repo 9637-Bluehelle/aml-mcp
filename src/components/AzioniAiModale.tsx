@@ -82,7 +82,7 @@ export function AzioniAiModale() {
         .order('created_at', { ascending: true }),
       supabase
         .from('documenti')
-        .select('id, tipologia, nome_file, file_path, cliente_id, incarico_id, persona_id, data_scadenza, descrizione, dimensione, created_at')
+        .select('id, tipologia, nome_file, file_path, cliente_id, incarico_id, persona_id, data_scadenza, descrizione, created_at')
         .eq('mcp_stato', 'pending')
         .order('created_at', { ascending: true }),
       supabase
