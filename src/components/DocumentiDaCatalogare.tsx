@@ -287,6 +287,9 @@ export function DocumentiDaCatalogare() {
               accept="application/pdf"
               multiple
               className="hidden"
+              // Il click programmatico di .click() rimbalza sul div padre (che ha onClick
+              // di apertura): fermiamo la propagazione per evitare riaperture del dialog.
+              onClick={(e) => e.stopPropagation()}
               onChange={(e) => {
                 if (e.target.files) uploadItems(Array.from(e.target.files).map((f) => ({ file: f, cartella: null })));
                 e.target.value = '';
@@ -299,6 +302,7 @@ export function DocumentiDaCatalogare() {
               type="file"
               multiple
               className="hidden"
+              onClick={(e) => e.stopPropagation()}
               {...({ webkitdirectory: '', directory: '' } as any)}
               onChange={(e) => {
                 if (e.target.files) {
@@ -318,14 +322,18 @@ export function DocumentiDaCatalogare() {
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-500">
                 <UploadCloud className="w-8 h-8 text-gray-400" />
-                {/*<span className="text-sm font-medium text-gray-700"></span>*/}
+                <p className="text-sm font-medium text-gray-700">
+                  Trascina qui i PDF, oppure{' '}
+                  <span className="text-blue-600 underline underline-offset-2">clicca per selezionarli</span>
+                </p>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click(); }}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700 underline underline-offset-2"
-                > Trascina qui PDF o una cartella, o clicca per selezionare i file
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                >
+                  …oppure seleziona un'intera cartella
                 </button>
-                <span className="text-xs">Solo PDF · da una cartella vengono presi solo i PDF (gli altri file sono ignorati)</span>
+                <span className="text-xs">Solo PDF · da una cartella vengono importati solo i file PDF (gli altri sono ignorati)</span>
               </div>
             )}
           </div>
