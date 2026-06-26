@@ -318,13 +318,12 @@ export function DocumentiDaCatalogare() {
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-500">
                 <UploadCloud className="w-8 h-8 text-gray-400" />
-                <span className="text-sm font-medium text-gray-700">Trascina qui PDF o una cartella, o clicca per selezionare i file</span>
+                {/*<span className="text-sm font-medium text-gray-700"></span>*/}
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click(); }}
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 underline underline-offset-2"
-                >
-                  …oppure seleziona una cartella
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                > Trascina qui PDF o una cartella, o clicca per selezionare i file
                 </button>
                 <span className="text-xs">Solo PDF · da una cartella vengono presi solo i PDF (gli altri file sono ignorati)</span>
               </div>
