@@ -1,0 +1,87 @@
+<!--
+  Template EmailJS per notifica account bloccato.
+  Da incollare nel template editor EmailJS: https://dashboard.emailjs.com/admin/templates
+
+  Variabili usate (dal codice src/lib/loginSecurity.ts -> sendLockoutEmail):
+    {{to_email}}       destinatario (anche nel campo "To Email" del template EmailJS)
+    {{support_email}}  email assistenza (VITE_SUPPORT_EMAIL)
+    {{app_name}}       nome applicazione
+    {{lockout_time}}   data/ora del blocco in formato IT
+
+  Subject consigliato:
+    [{{app_name}}] Il tuo account è stato bloccato
+
+  Nel campo "To Email" del template EmailJS scrivere: {{to_email}}
+  Nel campo "Reply To"                            scrivere: {{support_email}}
+-->
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <title>Account bloccato</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:32px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(15,23,42,0.08);">
+            <tr>
+              <td style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:28px 32px;color:#ffffff;">
+                <div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;opacity:0.75;">Avviso di sicurezza</div>
+                <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;">Il tuo account è stato bloccato</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px 8px;font-size:15px;line-height:1.55;">
+                <p style="margin:0 0 16px;">Ciao,</p>
+                <p style="margin:0 0 16px;">
+                  abbiamo rilevato <strong>5 tentativi di accesso falliti consecutivi</strong> sul tuo account
+                  <strong>{{to_email}}</strong> in {{app_name}} il giorno <strong>{{lockout_time}}</strong>.
+                </p>
+                <p style="margin:0 0 16px;">
+                  Per proteggere i tuoi dati abbiamo <strong>bloccato temporaneamente</strong> l'accesso.
+                  Lo sblocco non è automatico: occorre l'intervento dell'assistenza.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 16px;">
+                <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:14px 16px;border-radius:6px;font-size:14px;line-height:1.5;">
+                  <strong>Se sei stato tu</strong> e hai dimenticato la password, puoi sbloccare subito l'account usando
+                  la funzione <strong>&laquo;Password dimenticata&raquo;</strong> nella schermata di accesso: impostando una nuova
+                  password l'account viene sbloccato automaticamente. In alternativa contatta l'assistenza a
+                  <a href="mailto:{{support_email}}" style="color:#b45309;font-weight:600;text-decoration:none;">{{support_email}}</a>.
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 16px;">
+                <div style="background:#fee2e2;border-left:4px solid #dc2626;padding:14px 16px;border-radius:6px;font-size:14px;line-height:1.5;">
+                  <strong>Se non sei stato tu</strong>, qualcuno potrebbe aver tentato di accedere al tuo account.
+                  Contatta subito l'assistenza e valuta di cambiare la password una volta sbloccato.
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 28px;font-size:13px;line-height:1.6;color:#4b5563;">
+                <p style="margin:0 0 8px;"><strong>Cosa fare ora</strong></p>
+                <ol style="margin:0;padding-left:18px;">
+                  <li>Apri {{app_name}} e clicca su &laquo;Password dimenticata&raquo; nella schermata di accesso.</li>
+                  <li>Inserisci l'email {{to_email}} e segui le istruzioni: riceverai un codice OTP per impostare una nuova password.</li>
+                  <li>Una volta cambiata la password, l'account viene sbloccato automaticamente.</li>
+                  <li>Se non ricevi l'OTP o hai altri problemi, scrivi a <a href="mailto:{{support_email}}" style="color:#1d4ed8;text-decoration:none;">{{support_email}}</a> dall'indirizzo {{to_email}}.</li>
+                </ol>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f8fafc;padding:18px 32px;font-size:12px;color:#64748b;line-height:1.5;">
+                Questa è una notifica automatica inviata da {{app_name}}. Non rispondere direttamente a questa email;
+                per assistenza usa <a href="mailto:{{support_email}}" style="color:#1d4ed8;text-decoration:none;">{{support_email}}</a>.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
