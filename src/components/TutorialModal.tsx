@@ -299,7 +299,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
               <li><Ico icon={RefreshCw} /> <strong>Rinnova</strong> &mdash; caricare una nuova versione con nuova scadenza; la versione precedente viene conservata nello storico</li>
               <li><Ico icon={ArrowRightLeft} /> <strong>Sposta</strong> &mdash; cambiare l'associazione del documento da cliente a incarico specifico, o viceversa</li>
               <li><Ico icon={History} /> <strong>Storico</strong> &mdash; visualizzare le versioni precedenti (appare quando il documento è stato rinnovato almeno una volta)</li>
-              <li><Ico icon={Trash2} /> <strong>Elimina</strong> &mdash; disponibile <strong>solo nello</strong> <Ico icon={History} /> <strong>Storico</strong>, per rimuovere versioni precedenti già scadute. Il documento attuale non si elimina: puoi solo <Ico icon={RefreshCw} /> rinnovarlo</li>
+              <li><Ico icon={Trash2} /> <strong>Sposta nel cestino</strong> &mdash; disponibile su ogni documento (è l'ultima icona della riga): sposta il documento nel <strong>Cestino</strong>, da dove può essere ripristinato o eliminato definitivamente</li>
             </ul>
             <p className="mt-2">Le scadenze sono evidenziate con colori: <span className="text-red-600 font-medium">rosso</span> se scaduto, <span className="text-green-600 font-medium">verde</span> se valido.</p>
           </>
@@ -710,7 +710,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     ],
     bullets: [
       { text: <>Apri il cestino dall'icona <Ico icon={Trash2} /> nella barra in alto; il <strong>badge</strong> indica quanti elementi contiene</>, icon: Trash2 },
-      { text: <><strong>Sposta nel cestino</strong> &mdash; sostituisce l'eliminazione: l'elemento sparisce dall'applicazione ma resta recuperabile</>, icon: Trash2 },
+      { text: <><strong>Sposta nel cestino</strong> &mdash; l'elemento sparisce dall'applicazione ma resta recuperabile in qualsiasi momento</>, icon: Trash2 },
       { text: <><Ico icon={RotateCcw} /> <strong>Ripristina</strong> &mdash; riporta l'elemento (e tutti i suoi dati collegati) esattamente dov'era</>, icon: RotateCcw },
       { text: <><strong>Elimina definitivamente</strong> / <strong>Svuota cestino</strong> &mdash; cancella per sempre dati e documenti collegati (di norma riservato all'amministratore)</>, icon: Trash2, roles: ['admin', 'superadmin'] },
     ],
@@ -719,7 +719,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         titolo: 'Da dove si sposta nel cestino',
         body: (
           <>
-            <p>L'azione <strong>Sposta nel cestino</strong> ha preso il posto della vecchia eliminazione definitiva. La trovi:</p>
+            <p>L'azione <strong>Sposta nel cestino</strong> è disponibile in tutta l'applicazione. La trovi:</p>
             <ul className="list-disc pl-4 space-y-1">
               <li>Su <strong>cliente</strong> e <strong>incarico</strong>, nel menu azioni <Ico icon={MoreVertical} /> (in alto nel dettaglio)</li>
               <li>Sul singolo <strong>documento</strong>, <strong>anagrafica</strong>, autovalutazione <strong>RT1</strong>, valutazione <strong>RT2</strong>, controllo e segnalazione <strong>RT3</strong></li>
