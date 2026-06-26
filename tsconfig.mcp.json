@@ -1,0 +1,11 @@
+// Type-check del lato Node (server MCP + api/_lib condivisi) riusando la config dell'app, così
+// `import.meta.env`, JSX e i tipi Vite risolvono identici alla UI. Aggiunge `mcp/` e `api/` agli
+// include. Corregge `ignoreDeprecations` perché tsconfig.app usa un valore non valido per la
+// versione di TypeScript installata (vedi nota nel README MCP).
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "5.0"
+  },
+  "include": ["src", "mcp", "api"]
+}
