@@ -833,7 +833,6 @@ export function FascicoloCliente({} = {}) {
       teData,
       { data: docData },
       personaDocsResult,
-      { data: alertData },
       enrichedCliente,
     ] = await Promise.all([
       supabase.from('incarichi').select('*').eq('cliente_id', clienteId).is('deleted_at', null).order('data_inizio', { ascending: false }),
@@ -843,12 +842,28 @@ export function FascicoloCliente({} = {}) {
       personaIdsForDocs.length > 0
         ? supabase.from('documenti').select('*, rinnovo_di').in('persona_id', personaIdsForDocs).is('deleted_at', null).order('created_at', { ascending: false })
         : Promise.resolve({ data: [] as any[] }),
-      supabase.from('alert').select('*').eq('riferimento_id', clienteId).order('created_at', { ascending: false }),
       // Arricchisci il cliente con dati PEP da anagrafica_soggetti
       supabase.from('clienti').select('*').eq('id', clienteId).single().then(({ data }) =>
         data ? enrichClienteWithRappresentante(data) : null
       ),
     ]);
+
+    // Alert del fascicolo: gli alert non sono tutti ancorati al cliente. A seconda
+    // del tipo_rt, riferimento_id punta al cliente (RT4, RT2-DRAFT), all'incarico
+    // (RT2, RT2-SCADENZA, RT4-SCADENZA) o al documento (DOC-SCADENZA). Raccogliamo
+    // quindi gli alert di tutti gli elementi che appartengono al cliente: il cliente
+    // stesso, i suoi incarichi e i suoi documenti (anche quelli delle persone associate).
+    const incIdsForAlert = (incData || []).map(i => i.id);
+    const docIdsForAlert = [
+      ...(docData || []),
+      ...(personaDocsResult.data || []),
+    ].map(d => d.id);
+    const riferimentoIds = [clienteId, ...incIdsForAlert, ...docIdsForAlert];
+    const { data: alertData } = await supabase
+      .from('alert')
+      .select('*')
+      .in('riferimento_id', riferimentoIds)
+      .order('created_at', { ascending: false });
 
     // Dati arricchiti con PEP/rappresentante da anagrafica_soggetti
     if (enrichedCliente) {
