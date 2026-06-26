@@ -162,7 +162,7 @@ export function DocumentiDaCatalogare() {
     }
     setUploading(false);
 
-    if (ok > 0) toast.success(`${ok} file caricati nello staging.`);
+    if (ok > 0) toast.success(`${ok} file caricati.`);
     const avvisi: string[] = [];
     if (ignoratiNonPdf > 0) avvisi.push(`${ignoratiNonPdf} non PDF`);
     if (scartati > 0) avvisi.push(`${scartati} non validi`);
@@ -177,7 +177,7 @@ export function DocumentiDaCatalogare() {
     const { error } = await supabase.from('documenti_staging').delete().eq('id', r.id);
     setWorking((prev) => { const n = new Set(prev); n.delete(r.id); return n; });
     if (error) { toast.error(`Eliminazione fallita: ${error.message}`); return; }
-    toast.success('File rimosso dallo staging.');
+    toast.success('File rimosso.');
     reload();
   }, [reload, toast]);
 
@@ -220,7 +220,7 @@ export function DocumentiDaCatalogare() {
     const ids = rows.map((r) => r.id);
     const { error } = await supabase.from('documenti_staging').delete().in('id', ids);
     if (error) { toast.error(`Svuotamento fallito: ${error.message}`); return; }
-    toast.success('Staging svuotato.');
+    toast.success('Elenco svuotato.');
     reload();
   }, [rows, reload, toast]);
 
@@ -333,7 +333,7 @@ export function DocumentiDaCatalogare() {
           {/* Toolbar elenco */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-gray-700">
-              In staging {rows.length > 0 && <span className="text-gray-400">({rows.length})</span>}
+              In attesa di catalogazione {rows.length > 0 && <span className="text-gray-400">({rows.length})</span>}
             </h3>
             <div className="flex items-center gap-2">
               {proposteCount > 0 && (
@@ -348,7 +348,7 @@ export function DocumentiDaCatalogare() {
               )}
               {rows.length > 0 && (
                 <button onClick={() => setConfirmSvuota(true)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100">
-                  <Trash2 className="w-3.5 h-3.5" /> Svuota staging
+                  <Trash2 className="w-3.5 h-3.5" /> Svuota elenco
                 </button>
               )}
               <button onClick={() => reload()} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400" title="Aggiorna">
@@ -362,7 +362,7 @@ export function DocumentiDaCatalogare() {
             <div className="text-sm text-gray-400 py-8 text-center">Caricamento…</div>
           ) : rows.length === 0 ? (
             <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg p-6 text-center">
-              Nessun file in staging.
+              Nessun file in attesa di catalogazione.
             </div>
           ) : (
             <div className="space-y-2">
@@ -392,7 +392,7 @@ export function DocumentiDaCatalogare() {
                           onClick={() => setConfirmDelete(r)}
                           disabled={busy}
                           className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 disabled:opacity-50"
-                          title="Rimuovi dallo staging"
+                          title="Rimuovi dall'elenco"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -451,9 +451,9 @@ export function DocumentiDaCatalogare() {
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base font-semibold text-gray-900">Eliminare il file dallo staging?</h3>
+                <h3 className="text-base font-semibold text-gray-900">Eliminare il file?</h3>
                 <p className="text-sm text-gray-500 mt-1 break-words">
-                  «{confirmDelete.nome_file}» verrà rimosso definitivamente dallo staging.
+                  «{confirmDelete.nome_file}» verrà rimosso definitivamente.
                   L'operazione <strong>non è reversibile</strong>: per ricaricarlo dovrai trascinarlo di nuovo.
                 </p>
               </div>
@@ -486,9 +486,9 @@ export function DocumentiDaCatalogare() {
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base font-semibold text-gray-900">Svuotare tutto lo staging?</h3>
+                <h3 className="text-base font-semibold text-gray-900">Svuotare tutto l'elenco?</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Verranno rimossi definitivamente <strong>{rows.length}</strong> file in staging
+                  Verranno rimossi definitivamente <strong>{rows.length}</strong> file in attesa di catalogazione
                   {' '}(comprese eventuali proposte AI non ancora approvate).
                   L'operazione <strong>non è reversibile</strong>.
                 </p>
