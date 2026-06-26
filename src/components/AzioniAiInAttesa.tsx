@@ -106,7 +106,7 @@ export function AzioniAiInAttesa() {
       // Documenti MCP in attesa di approvazione dell'associazione (§5.1.3).
       supabase
         .from('documenti')
-        .select('id, tipologia, nome_file, file_path, cliente_id, incarico_id, persona_id, data_scadenza, descrizione, dimensione, created_at')
+        .select('id, tipologia, nome_file, file_path, cliente_id, incarico_id, persona_id, data_scadenza, descrizione, created_at')
         .eq('mcp_stato', 'pending')
         .order('created_at', { ascending: false }),
     ]);
