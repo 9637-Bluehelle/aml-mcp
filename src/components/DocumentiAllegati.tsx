@@ -883,6 +883,11 @@ export function DocumentiAllegati({
                         <RefreshCw className="w-4 h-4" />
                       </button>
                     )}
+                    {!readOnly && puoCestina && (
+                      <button onClick={() => handleDeleteDocumento(doc)} className="p-1.5 hover:bg-red-100 rounded text-red-500" title="Sposta nel cestino">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -986,6 +991,15 @@ export function DocumentiAllegati({
                       title={doc.incarico_id ? 'Sposta a documento del cliente' : 'Associa a un incarico'}
                     >
                       <ArrowRightLeft className="w-4 h-4" />
+                    </button>
+                  )}
+                  {!readOnly && puoCestina && (
+                    <button
+                      onClick={() => handleDeleteDocumento(doc)}
+                      className="p-1.5 hover:bg-red-100 rounded text-red-500"
+                      title="Sposta nel cestino"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
@@ -1127,7 +1141,7 @@ export function DocumentiAllegati({
                     {doc.file_path?.startsWith('*') && (
                       <span className="text-xs text-gray-400 italic">Cartaceo</span>
                     )}
-                    {!readOnly && puoCestina && idx > 0 && doc.data_scadenza && new Date(doc.data_scadenza) < new Date() && (
+                    {!readOnly && puoCestina && (
                       <button
                         onClick={() => handleDeleteDocumento(doc)}
                         className="p-1.5 hover:bg-red-100 rounded text-red-500"
@@ -1192,6 +1206,12 @@ export function DocumentiAllegati({
                 <div className="flex items-start gap-3">
                   <ArrowRightLeft className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
                   <div><strong>Sposta</strong> — Cambia l'associazione del documento: da documento del cliente a documento di un incarico specifico, o viceversa.</div>
+                </div>
+                )}
+                {puoCestina && (
+                <div className="flex items-start gap-3">
+                  <Trash2 className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div><strong>Sposta nel cestino</strong> — Sposta il documento nel cestino, da cui può essere ripristinato o eliminato definitivamente.</div>
                 </div>
                 )}
               </div>
