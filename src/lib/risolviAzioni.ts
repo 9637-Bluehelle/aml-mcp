@@ -7,9 +7,15 @@ import type { ContestoNomi } from './dettaglioAzioni';
 
 interface Azione { tool: string; args?: Record<string, any> }
 
+// Solo gli UUID veri vanno interrogati: un id può essere un riferimento intra-piano "@passo:N"
+// (entità non ancora creata) — passarlo a .in('id', …) su una colonna uuid farebbe fallire l'intera
+// query. Tali riferimenti semplicemente non si risolvono in un nome (corretto: l'entità non esiste).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const soloUuid = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+
 export async function risolviNomiAzioni(azioni: Azione[]): Promise<ContestoNomi> {
-  const cliIds = azioni.filter((a) => a.tool === 'crea_incarico').map((a) => a.args?.cliente_id).filter(Boolean) as string[];
-  const incIds = azioni.filter((a) => a.tool === 'crea_valutazione').map((a) => a.args?.incarico_id).filter(Boolean) as string[];
+  const cliIds = azioni.filter((a) => a.tool === 'crea_incarico').map((a) => a.args?.cliente_id).filter(soloUuid);
+  const incIds = azioni.filter((a) => a.tool === 'crea_valutazione').map((a) => a.args?.incarico_id).filter(soloUuid);
 
   const incarichiInfo: ContestoNomi['incarichiInfo'] = {};
   const incClienteId: Record<string, string | null> = {};
