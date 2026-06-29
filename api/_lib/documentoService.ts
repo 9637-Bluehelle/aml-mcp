@@ -113,7 +113,7 @@ export async function risolviAssociazione(
 
   const data_scadenza = toIsoDate(meta.data_scadenza);
   if (TIPOLOGIE_CON_SCADENZA.has(tip.value) && !data_scadenza) {
-    throw new Error(`La tipologia "${tip.value}" richiede una data_scadenza (ISO yyyy-mm-dd o dd/mm/yyyy).`);
+    throw new Error(`La tipologia "${tip.value}" richiede una data_scadenza (formato dd/mm/yyyy, es. 31/12/2026).`);
   }
 
   if (tip.level === 'persona') {
