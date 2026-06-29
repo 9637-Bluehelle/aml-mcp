@@ -122,6 +122,28 @@ async function loadImpostazioniIncarico(
 }
 
 /**
+ * Policy di numerazione del codice incarico dello studio, "spiegata" all'AI: serve a sapere PRIMA
+ * di proporre un incarico se il `codice_incarico` va fornito a mano (formato 'manuale') o se lo
+ * genera il sistema — evitando il fallimento "codice_incarico mancante" in esecuzione.
+ */
+export async function descriviImpostazioniIncarico(
+  client: SupabaseClient,
+  studioId: string,
+): Promise<{ codice_incarico: { formato: FormatoCodice; manuale: boolean; nota: string } }> {
+  const imp = await loadImpostazioniIncarico(client, studioId);
+  const manuale = imp.formato === 'manuale';
+  return {
+    codice_incarico: {
+      formato: imp.formato,
+      manuale,
+      nota: manuale
+        ? 'Numerazione MANUALE: devi fornire tu il codice_incarico in crea_incarico (segui la convenzione degli altri incarichi dello studio, vedi lista_incarichi).'
+        : 'Numerazione AUTOMATICA: ometti codice_incarico, lo genera il sistema. Se ne fornisci uno, viene usato quello.',
+    },
+  };
+}
+
+/**
  * Genera il codice incarico secondo le impostazioni dello studio (mirror di
  * src/lib/codiceGenerator.generateCodiceIncarico), con i conteggi scopati allo studio per non
  * collidere/sballare per un superadmin. Ritorna null se il formato è 'manuale' (il codice deve
@@ -190,7 +212,7 @@ export async function salvaIncarico(
   if (!cliente) throw new Error('Cliente non trovato nello studio: verifica cliente_id con lista_clienti.');
 
   const dataInizio = formatDateForDB(args.data_inizio);
-  if (!dataInizio) throw new Error(`data_inizio non valida ("${args.data_inizio}"): usa dd/mm/yyyy o ISO yyyy-mm-dd.`);
+  if (!dataInizio) throw new Error(`data_inizio non valida ("${args.data_inizio}"): usa il formato dd/mm/yyyy (es. 15/01/2026).`);
   const dataFine = args.data_fine ? formatDateForDB(args.data_fine) : null;
 
   // Codice: usa quello fornito; altrimenti generalo dalle impostazioni studio. Se il formato è
