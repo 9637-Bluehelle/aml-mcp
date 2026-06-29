@@ -17,6 +17,69 @@ export interface AzionePiano {
   args: Record<string, any>;
 }
 
+// --- Riferimenti intra-piano "@passo:N" -------------------------------------------------------
+// Un'azione può riferirsi all'UUID di un'entità creata in un PASSO PRECEDENTE dello stesso piano
+// (es. crea_incarico.cliente_id = "@passo:1" dopo crea_bozza_cliente). Il token è validato alla
+// proposta (deve puntare a un passo precedente che produce un id) e sostituito con l'UUID reale in
+// esecuzione. Tool che producono un id referenziabile:
+const TOOL_PRODUCE_ID = new Set(['crea_bozza_cliente', 'crea_soggetto', 'crea_incarico']);
+const PASSO_REF_CAPTURE = /^@passo:(\d+)$/;
+
+/** Raccoglie ricorsivamente tutti gli N referenziati ("@passo:N") negli args di un'azione. */
+function collectPassoRefs(value: any, out: number[] = []): number[] {
+  if (typeof value === 'string') {
+    const m = value.match(PASSO_REF_CAPTURE);
+    if (m) out.push(Number(m[1]));
+  } else if (Array.isArray(value)) {
+    for (const v of value) collectPassoRefs(v, out);
+  } else if (value && typeof value === 'object') {
+    for (const v of Object.values(value)) collectPassoRefs(v, out);
+  }
+  return out;
+}
+
+/** Sostituisce ogni "@passo:N" con l'UUID prodotto dal passo N (1-based) leggendo l'esito finora. */
+function resolvePassoRefs(value: any, esito: any[]): any {
+  if (typeof value === 'string') {
+    const m = value.match(PASSO_REF_CAPTURE);
+    if (!m) return value;
+    const ref = esito.find((e) => e.index === Number(m[1]) - 1);
+    if (!ref || !ref.ok || !ref.id) {
+      throw new Error(`Riferimento "@passo:${m[1]}" non risolvibile: il passo ${m[1]} non è stato eseguito correttamente o non ha prodotto un ID.`);
+    }
+    return ref.id;
+  }
+  if (Array.isArray(value)) return value.map((v) => resolvePassoRefs(v, esito));
+  if (value && typeof value === 'object') {
+    const o: Record<string, any> = {};
+    for (const k of Object.keys(value)) o[k] = resolvePassoRefs(value[k], esito);
+    return o;
+  }
+  return value;
+}
+
+/** Verifica che ogni "@passo:N" punti a un passo PRECEDENTE che produce un id referenziabile. */
+function validaPassoRefs(azioni: AzionePiano[]): void {
+  azioni.forEach((a, i) => {
+    for (const n of collectPassoRefs(a.args)) {
+      if (!Number.isInteger(n) || n < 1) {
+        throw new Error(`Azione #${i + 1}: "@passo:${n}" non valido (N dev'essere il numero, 1-based, di un passo).`);
+      }
+      const idx = n - 1;
+      if (idx >= azioni.length) {
+        throw new Error(`Azione #${i + 1}: "@passo:${n}" non esiste (il piano ha ${azioni.length} passi).`);
+      }
+      if (idx >= i) {
+        throw new Error(`Azione #${i + 1}: "@passo:${n}" deve riferirsi a un passo PRECEDENTE (1..${i}).`);
+      }
+      const refTool = azioni[idx].tool;
+      if (!TOOL_PRODUCE_ID.has(refTool)) {
+        throw new Error(`Azione #${i + 1}: "@passo:${n}" punta a ${refTool}, che non produce un ID referenziabile.`);
+      }
+    }
+  });
+}
+
 function buildApprovalLink(planId: string): string {
   const base = process.env.MCP_APP_BASE_URL || process.env.VITE_APP_BASE_URL || '';
   const path = `/?mcp_plan=${planId}`;
@@ -56,13 +119,16 @@ function validaAzioni(azioni: AzionePiano[]): AzionePiano[] {
   if (!Array.isArray(azioni) || azioni.length === 0) {
     throw new Error('Il piano deve contenere almeno un\'azione.');
   }
-  return azioni.map((a, i) => {
+  const validate = azioni.map((a, i) => {
     const schema = AZIONI_PIANO_SCHEMAS[a?.tool];
     if (!schema) {
       throw new Error(`Azione #${i + 1}: tool non ammesso nei piani ("${a?.tool}").`);
     }
     return { tool: a.tool, args: schema.parse(a.args ?? {}) as Record<string, any> };
   });
+  // I riferimenti "@passo:N" devono puntare a un passo precedente che produce un id (§7.3).
+  validaPassoRefs(validate);
+  return validate;
 }
 
 /** Riepilogo leggibile delle azioni (una riga per azione) per il messaggio di ritorno. */
@@ -171,7 +237,7 @@ export async function eseguiPiano(
   client: SupabaseClient,
   studioId: string | null,
   planId: string,
-): Promise<{ plan_id: string; eseguite: number; totali: number; esito: any[] }> {
+): Promise<{ plan_id: string; status: string; eseguite: number; totali: number; esito: any[] }> {
   const { data: plan, error } = await client
     .from('mcp_pending_plans')
     .select('id, status, azioni, expires_at')
@@ -209,21 +275,30 @@ export async function eseguiPiano(
   const esito: any[] = [];
   for (let i = 0; i < azioni.length; i++) {
     try {
-      const r = await executeAzione(client, studioId, azioni[i]);
+      // Risolve i "@passo:N" con gli id realmente creati dai passi precedenti (esito finora).
+      const args = resolvePassoRefs(azioni[i].args, esito);
+      const r = await executeAzione(client, studioId, { tool: azioni[i].tool, args });
       esito.push({ index: i, ...r });
     } catch (e: any) {
       esito.push({ index: i, tool: azioni[i]?.tool, ok: false, error: e?.message || String(e) });
     }
   }
 
+  // Stato finale: 'executed' solo se TUTTE le azioni sono state scritte; altrimenti 'failed' (piano
+  // approvato ma non scritto del tutto) — così la UI lo distingue con un badge dedicato e l'AI,
+  // leggendo stato_piano, sa che qualcosa NON è stato scritto invece di dedurlo dalle liste.
+  const eseguite = esito.filter((e) => e.ok).length;
+  const statoFinale = eseguite === azioni.length ? 'executed' : 'failed';
+
   await client
     .from('mcp_pending_plans')
-    .update({ status: 'executed', esito, executed_at: new Date().toISOString() })
+    .update({ status: statoFinale, esito, executed_at: new Date().toISOString() })
     .eq('id', planId);
 
   return {
     plan_id: planId,
-    eseguite: esito.filter((e) => e.ok).length,
+    status: statoFinale,
+    eseguite,
     totali: azioni.length,
     esito,
   };
