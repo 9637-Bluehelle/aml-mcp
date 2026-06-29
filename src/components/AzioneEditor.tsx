@@ -6,6 +6,7 @@
 // all'AI un piano aggiornato. Si mostrano solo i campi effettivamente valorizzati dall'AI.
 
 import { Fragment } from 'react';
+import { formatDateToISO, normalizeDate } from './cliente-wizard/utils';
 
 export type CampoTipo = 'text' | 'textarea' | 'date' | 'number' | 'bool' | 'score';
 export interface CampoEditabile { key: string; label: string; tipo: CampoTipo; gruppo?: string }
@@ -130,10 +131,21 @@ function CampoInput({ campo, value, onChange }: { campo: CampoEditabile; value: 
   switch (campo.tipo) {
     case 'textarea':
       return <textarea value={value ?? ''} rows={2} onChange={(e) => onChange(e.target.value)} className={base} />;
-    case 'date':
-      // Le date dell'AI sono ISO (yyyy-mm-dd); se il valore non è ISO l'input resta vuoto ma il
-      // valore originale è preservato finché l'utente non sceglie una data nuova.
-      return <input type="date" value={/^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? value : ''} onChange={(e) => onChange(e.target.value)} className={base} />;
+    case 'date': {
+      // Formato canonico delle date in tutto il sistema: dd/mm/yyyy (vedi schemi MCP). L'<input
+      // type="date"> lavora però in ISO, quindi convertiamo: dd/mm/yyyy → ISO per il `value` e
+      // ISO → dd/mm/yyyy in `onChange`, così l'arg salvato resta dd/mm/yyyy (eseguibile dai
+      // servizi). Accettiamo anche un valore già ISO (retrocompat) normalizzandolo per la vista.
+      const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? String(value) : formatDateToISO(String(value ?? ''));
+      return (
+        <input
+          type="date"
+          value={iso}
+          onChange={(e) => onChange(e.target.value ? normalizeDate(e.target.value) : '')}
+          className={base}
+        />
+      );
+    }
     case 'number':
       return <input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} className={base} />;
     case 'bool':
