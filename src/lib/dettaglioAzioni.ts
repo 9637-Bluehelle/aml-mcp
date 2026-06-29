@@ -16,20 +16,25 @@ export const TOOL_LABEL: Record<string, string> = {
   crea_valutazione: 'Crea valutazione del rischio (RT2)',
 };
 
-/** Riepilogo breve degli argomenti di un'azione (una riga), dedotto dai campi presenti. */
-export function riassuntoArgs(args: Record<string, any>): string {
+/** Riepilogo breve degli argomenti di un'azione (una riga), dedotto dai campi presenti. I nomi
+ *  (incarico, prestazione) sono risolti dal `ctx` quando disponibile, così il riepilogo non mostra
+ *  mai UUID grezzi ma codici/etichette leggibili. */
+export function riassuntoArgs(args: Record<string, any>, ctx?: ContestoNomi): string {
   const parts: string[] = [];
-  // Valutazione RT2: incarico + punteggi.
+  // Valutazione RT2: incarico + punteggi. Mostriamo il codice incarico (non l'UUID); se non
+  // risolto, omettiamo del tutto il riferimento invece di esporre l'id tecnico.
   if (args.tabella_a) {
-    if (args.incarico_id) parts.push(`incarico: ${args.incarico_id}`);
+    const codiceIncarico = ctx?.incarichiInfo[args.incarico_id]?.codice;
+    if (codiceIncarico) parts.push(`incarico ${codiceIncarico}`);
     parts.push(`Tab.A: ${Object.values(args.tabella_a as Record<string, number>).join('/')}`);
     if (args.tabella_b) parts.push(`Tab.B: ${Object.values(args.tabella_b as Record<string, number>).join('/')}`);
     return parts.join(' · ') || '(dettagli sotto)';
   }
-  // Incarico: campi propri.
+  // Incarico: campi propri. La prestazione è risolta in etichetta (non l'UUID del catalogo).
   if (args.tipologia_prestazione_id || args.data_inizio) {
     if (args.codice_incarico) parts.push(`codice: ${args.codice_incarico}`);
-    if (args.tipologia_prestazione_id) parts.push(`prestazione: ${args.tipologia_prestazione_id}`);
+    const prest = getPrestazione(args.tipologia_prestazione_id);
+    if (prest) parts.push(`prestazione: ${prest.label}`);
     if (args.data_inizio) parts.push(`inizio: ${args.data_inizio}`);
     return parts.join(' · ') || '(dettagli sotto)';
   }
