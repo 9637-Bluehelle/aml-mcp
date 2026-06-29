@@ -31,8 +31,10 @@ export function ContenutoDettaglio({ righe, anteprima, tinted = false }: { righe
   if (righe.length === 0 && !anteprima) return null;
   return (
     <div className={`${tinted ? 'bg-white' : 'bg-gray-50'} rounded-lg p-3 border border-gray-200 space-y-3`}>
+      {/* minmax(0,1fr) e non "1fr": senza il min 0 il track non scende sotto la dimensione del
+          contenuto e i valori lunghi sborderebbero oltre il bordo del box (accanto ai bottoni). */}
       {righe.length > 0 && (
-        <dl className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1 text-xs">
+        <dl className="grid grid-cols-[9rem_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
           {righe.map((r, i) => {
             const nuovoGruppo = r.gruppo && r.gruppo !== righe[i - 1]?.gruppo;
             return (
@@ -56,7 +58,7 @@ export function ContenutoDettaglio({ righe, anteprima, tinted = false }: { righe
             <Gauge className="w-3.5 h-3.5" />
             Anteprima rischio (calcolata)
           </div>
-          <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+          <div className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs">
             <span className="opacity-70">Classe</span>
             <span className="font-medium">{anteprima.classe} — {CLASSE_LABEL[anteprima.classe]}</span>
             <span className="opacity-70">Rischio effettivo</span>
