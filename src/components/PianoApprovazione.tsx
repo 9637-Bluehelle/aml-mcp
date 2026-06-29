@@ -10,7 +10,7 @@ import { CheckCircle, XCircle, Clock, AlertTriangle, ArrowLeft, Bot, X, Pencil, 
 import { supabase } from '../lib/supabase';
 import { useToast } from './Toast';
 import { eseguiPiano } from '../../api/_lib/mcpPlans';
-import { DettaglioAzione } from './DettaglioAzione';
+import { DettaglioAzione, ContenutoDettaglio } from './DettaglioAzione';
 import { TOOL_LABEL, riassuntoArgs, buildDettaglioAzione, type ContestoNomi } from '../lib/dettaglioAzioni';
 import { risolviNomiAzioni } from '../lib/risolviAzioni';
 import { AzioneEditor, setArgPath, haCampiEditabili } from './AzioneEditor';
@@ -20,7 +20,7 @@ interface Piano {
   id: string;
   titolo: string | null;
   azioni: Azione[];
-  status: 'pending' | 'approved' | 'rejected' | 'executing' | 'executed' | 'expired';
+  status: 'pending' | 'approved' | 'rejected' | 'executing' | 'executed' | 'expired' | 'failed';
   esito: any[] | null;
   created_at: string;
   expires_at: string;
@@ -33,8 +33,64 @@ const STATUS_BADGE: Record<Piano['status'], { label: string; cls: string }> = {
   executing: { label: 'In esecuzione', cls: 'bg-blue-50 text-blue-700' },
   executed: { label: 'Eseguito', cls: 'bg-green-50 text-green-700' },
   expired: { label: 'Scaduto', cls: 'bg-gray-100 text-gray-500' },
+  // Approvato ed eseguito ma con almeno un'azione NON scritta (errore in esecuzione): arancione scuro.
+  failed: { label: 'Errore esecuzione', cls: 'bg-orange-200 text-orange-900' },
 };
 
+// Contenitore della scheda piano. DEVE stare a livello di modulo (non dentro PianoApprovazione):
+// se definito inline, ogni render — es. a ogni tasto durante la modifica — ne crea una nuova
+// reference, React smonta/rimonta l'intero sottoalbero e il container scrollabile torna in cima,
+// facendo "saltare" la modale via dall'entry che si sta scrivendo.
+function PianoWrapper({
+  variant,
+  queueCount,
+  onClose,
+  backLabel,
+  children,
+}: {
+  variant: 'page' | 'modal';
+  queueCount: number;
+  onClose: () => void;
+  backLabel: string;
+  children: React.ReactNode;
+}) {
+  if (variant === 'modal') {
+    // Overlay globale: compare sopra qualsiasi scheda. "Più tardi" (X) rimanda senza decidere,
+    // il piano resta nel badge/scheda "Azioni AI". z-[80] sta sotto la modale offline (z-[100]).
+    return createPortal(
+      <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
+        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between">
+            {queueCount > 0 ? (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                +{queueCount} {queueCount === 1 ? 'altra in attesa' : 'altre in attesa'}
+              </span>
+            ) : <span />}
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700"
+              title="Più tardi"
+            >
+              Più tardi <X className="w-4 h-4" />
+            </button>
+          </div>
+          {children}
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 sm:p-8">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-5">
+        <button onClick={onClose} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+          <ArrowLeft className="w-4 h-4" /> {backLabel}
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export function PianoApprovazione({
   planId,
@@ -187,56 +243,20 @@ export function PianoApprovazione({
     }
   }
 
-  const Wrapper = ({ children }: { children: React.ReactNode }) => {
-    if (variant === 'modal') {
-      // Overlay globale: compare sopra qualsiasi scheda. "Più tardi" (X) rimanda senza decidere,
-      // il piano resta nel badge/scheda "Azioni AI". z-[80] sta sotto la modale offline (z-[100]).
-      return createPortal(
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              {queueCount > 0 ? (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                  +{queueCount} {queueCount === 1 ? 'altra in attesa' : 'altre in attesa'}
-                </span>
-              ) : <span />}
-              <button
-                onClick={onClose}
-                className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700"
-                title="Più tardi"
-              >
-                Più tardi <X className="w-4 h-4" />
-              </button>
-            </div>
-            {children}
-          </div>
-        </div>,
-        document.body,
-      );
-    }
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 sm:p-8">
-        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-5">
-          <button onClick={onClose} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-            <ArrowLeft className="w-4 h-4" /> {backLabel}
-          </button>
-          {children}
-        </div>
-      </div>
-    );
-  };
+  // Props del contenitore (estratto a livello di modulo per non rimontare a ogni render: vedi nota su PianoWrapper).
+  const wrap = { variant, queueCount, onClose, backLabel };
 
-  if (loading) return <Wrapper><div className="py-10 text-center text-gray-400">Caricamento piano…</div></Wrapper>;
+  if (loading) return <PianoWrapper {...wrap}><div className="py-10 text-center text-gray-400">Caricamento piano…</div></PianoWrapper>;
 
   if (notFound || !piano) {
     return (
-      <Wrapper>
+      <PianoWrapper {...wrap}>
         <div className="flex items-start gap-2 bg-amber-50 text-amber-700 rounded-lg p-4 text-sm">
           <AlertTriangle className="w-5 h-5 shrink-0" />
           <span>Piano non trovato, non appartiene al tuo account, oppure la tabella non è ancora stata
             creata (migrazione <code>20260618000200_mcp_pending_plans.sql</code>).</span>
         </div>
-      </Wrapper>
+      </PianoWrapper>
     );
   }
 
@@ -245,7 +265,7 @@ export function PianoApprovazione({
 
   // Righe di dettaglio + (per le RT2) anteprima rischio, per una singola azione del piano.
   return (
-    <Wrapper>
+    <PianoWrapper {...wrap}>
       <div className="flex items-center gap-2">
         <Bot className="w-6 h-6 text-blue-600" />
         <h2 className="text-xl font-bold text-gray-900">Azione AI in attesa</h2>
@@ -312,18 +332,39 @@ export function PianoApprovazione({
         {azioniCorrenti.map((a, i) => {
           const esito = piano.esito?.find((e) => e.index === i);
           return (
-            <div key={i} className="px-4 py-3 flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-800">{i + 1}. {TOOL_LABEL[a.tool] || a.tool}</div>
-                <div className="text-xs text-gray-500 mt-0.5 break-words">{riassuntoArgs(a.args)}</div>
-                {editing ? (
-                  <div className="mt-2"><AzioneEditor tool={a.tool} args={a.args} onChange={(path, v) => setCampo(i, path, v)} /></div>
-                ) : (() => { const d = buildDettaglioAzione(a.tool, a.args, nomi); return <DettaglioAzione righe={d.righe} anteprima={d.anteprima} />; })()}
+            <div key={i} className="px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-800">{i + 1}. {TOOL_LABEL[a.tool] || a.tool}</div>
+                  <div className="text-xs text-gray-500 mt-0.5 break-words">{riassuntoArgs(a.args, nomi)}</div>
+                  {editing ? (
+                    // In modifica mostriamo l'editor dei campi e — sotto — l'anteprima rischio RT2
+                    // ricalcolata in tempo reale dal draft, così l'utente vede subito l'impatto delle
+                    // modifiche ai punteggi (classe/rischio/periodicità) mentre li corregge.
+                    (() => {
+                      const d = buildDettaglioAzione(a.tool, a.args, nomi);
+                      return (
+                        <div className="mt-2 space-y-2">
+                          <AzioneEditor tool={a.tool} args={a.args} onChange={(path, v) => setCampo(i, path, v)} />
+                          {d.anteprima && <ContenutoDettaglio righe={[]} anteprima={d.anteprima} />}
+                        </div>
+                      );
+                    })()
+                  ) : (() => { const d = buildDettaglioAzione(a.tool, a.args, nomi); return <DettaglioAzione righe={d.righe} anteprima={d.anteprima} />; })()}
+                </div>
+                {/* Badge breve: solo l'esito. Il messaggio d'errore (può essere lungo) va a capo nel
+                    blocco sotto — qui resterebbe su una riga con shrink-0 e sforerebbe il riquadro,
+                    schiacciando la colonna di sinistra. */}
+                {esito && !editing && (
+                  <span className={`shrink-0 text-xs font-medium ${esito.ok ? 'text-green-600' : 'text-red-600'}`}>
+                    {esito.ok ? '✓ ok' : '✗ errore'}
+                  </span>
+                )}
               </div>
-              {esito && !editing && (
-                <span className={`shrink-0 text-xs ${esito.ok ? 'text-green-600' : 'text-red-600'}`}>
-                  {esito.ok ? '✓ ok' : `✗ ${esito.error || 'errore'}`}
-                </span>
+              {esito && !editing && !esito.ok && esito.error && (
+                <div className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-words">
+                  {esito.error}
+                </div>
               )}
             </div>
           );
@@ -348,6 +389,15 @@ export function PianoApprovazione({
             <XCircle className="w-4 h-4" /> Rifiuta
           </button>
         </div>
+      ) : piano.status === 'failed' ? (
+        // Approvato ma NON scritto del tutto: avviso in arancione scuro. Il dettaglio per-azione
+        // (✓/✗ + messaggio d'errore) è già mostrato sopra; qui spieghiamo la via d'uscita.
+        <div className="flex items-start gap-2 text-sm text-orange-900 bg-orange-100 border border-orange-300 rounded-lg p-3">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>Piano approvato ma <strong>non eseguito del tutto</strong>: una o più azioni non sono state
+            scritte (vedi gli errori qui sopra). Un piano non è rieseguibile: per riprovare, chiedi
+            all'assistente AI di riproporre le azioni mancanti in un nuovo piano.</span>
+        </div>
       ) : (
         <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 rounded-lg p-3">
           <Clock className="w-4 h-4" />
@@ -358,6 +408,6 @@ export function PianoApprovazione({
           {(piano.status === 'expired' || (scaduto && piano.status === 'pending')) && 'Piano scaduto: non più eseguibile.'}
         </div>
       ))}
-    </Wrapper>
+    </PianoWrapper>
   );
 }
