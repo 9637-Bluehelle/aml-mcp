@@ -19,7 +19,7 @@ import { tierAllows, type McpTier } from './mcpAuth.js';
 import { creaBozzaClienteSchema, creaSoggettoSchema, creaIncaricoSchema, creaValutazioneSchema, mapArgsToWizardData, mapArgsToPersona } from './mcpTools.js';
 import { proponiPiano, aggiornaPiano, eseguiPiano, statoPiano, type AzionePiano } from './mcpPlans.js';
 import { descriviTipologie, preparaUploadDocumento, confermaUploadDocumento, caricaDocumentoBase64 } from './documentoService.js';
-import { descriviTipologiePrestazione } from './incaricoService.js';
+import { descriviTipologiePrestazione, descriviImpostazioniIncarico } from './incaricoService.js';
 import { listaStaging, leggiStaging, proponiCatalogazione } from './documentiStagingService.js';
 
 function jsonResult(obj: unknown) {
@@ -404,7 +404,13 @@ export function buildMcpServer(
     'stato_piano',
     {
       title: 'Stato di un piano',
-      description: "Restituisce lo stato di un piano proposto (pending/approved/rejected/executing/executed/expired) e, se eseguito, l'esito per-azione. Utile per attendere l'approvazione umana prima di esegui_piano.",
+      description:
+        "Restituisce lo stato di un piano proposto (pending/approved/rejected/executing/executed/expired/failed) e, " +
+        "una volta eseguito, l'esito per-azione [{ index, tool, ok, id?, error? }]. Dopo l'approvazione USA SEMPRE " +
+        "questo per CONFERMARE cosa è stato scritto: NON dedurlo dalle liste (lista_incarichi, ecc.) né dare per " +
+        "scontato il successo. status='executed' = tutte le azioni scritte; status='failed' = approvato ma almeno " +
+        "un'azione NON scritta (leggi 'error' nell'esito): in tal caso il piano NON è rieseguibile, riproponi le " +
+        "azioni mancanti in un nuovo piano. Utile anche per attendere l'approvazione umana.",
       inputSchema: { plan_id: z.string().uuid().describe('UUID del piano.') },
     },
     async (args) => {
@@ -455,6 +461,28 @@ export function buildMcpServer(
     },
   );
 
+  server.registerTool(
+    'descrivi_impostazioni_studio',
+    {
+      title: 'Impostazioni dello studio (numerazione incarichi)',
+      description:
+        "Restituisce le impostazioni dello studio rilevanti per le scritture: in particolare la numerazione del " +
+        "codice_incarico (manuale vs automatica). Consultalo PRIMA di proporre un incarico: se la numerazione è " +
+        "manuale devi fornire tu codice_incarico (seguendo la convenzione vista in lista_incarichi); se è " +
+        "automatica ometti il codice e lo genera il sistema. Evita il fallimento 'codice_incarico mancante'.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        const sid = requireStudio();
+        return jsonResult(await descriviImpostazioniIncarico(client, sid));
+      } catch (e: any) {
+        return errorResult(e?.message || String(e));
+      }
+    },
+  );
+
   // ---------------------------------------------------------------- SCRITTURA (tier ≥ draft)
 
   if (tierAllows(tier, 'draft')) {
@@ -465,8 +493,10 @@ export function buildMcpServer(
         description:
           "Crea un nuovo cliente in stato BOZZA (draft) nello studio dell'utente. Usa i campi col suffisso del tipo " +
           '(_pf persona fisica, _impresa impresa, _prof professionista). Resta una bozza inerte finché un operatore ' +
-          "non la completa/attiva nell'app. Le anagrafiche collegate sono create/deduplicate per CF. Non attiva, " +
-          'non modifica record esistenti, non carica documenti.',
+          "non la completa/attiva nell'app. Le anagrafiche collegate sono create/deduplicate per CF. TITOLARI " +
+          "EFFETTIVI (imprese): se sono noti, passali nell'array strutturato 'titolari_effettivi' (uno per ogni " +
+          "titolare, con ruolo/quota, CF, PEP, ecc.) — NON descriverli a parole nelle note di verifica, altrimenti " +
+          'non vengono registrati come veri titolari effettivi. Non attiva, non modifica record esistenti, non carica documenti.',
         inputSchema: creaBozzaClienteSchema,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       },
@@ -528,8 +558,9 @@ export function buildMcpServer(
         description:
           "Propone la creazione di UN incarico per un cliente dello studio. NON scrive subito: crea una proposta che " +
           "l'utente approva nella modale; dopo l'approvazione chiama esegui_piano(plan_id). Risolvi prima il cliente con " +
-          'lista_clienti (cerca per nome con "query") e la tipologia con descrivi_tipologie_prestazione. Per creare più ' +
-          'incarichi in blocco usa invece proponi_piano.',
+          'lista_clienti (cerca per nome con "query") e la tipologia con descrivi_tipologie_prestazione. Controlla con ' +
+          'descrivi_impostazioni_studio se la numerazione è manuale: in tal caso fornisci codice_incarico. Per creare ' +
+          'cliente+incarico (+valutazione) insieme, o più incarichi in blocco, usa proponi_piano (con i riferimenti "@passo:N").',
         inputSchema: creaIncaricoSchema,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       },
@@ -587,10 +618,14 @@ export function buildMcpServer(
           'Prepara un piano di N azioni di scrittura (crea_bozza_cliente / crea_soggetto / crea_incarico / ' +
           "crea_valutazione) da approvare in blocco da un umano PRIMA dell'esecuzione. Usa questo (invece dei " +
           'singoli tool) per le scritture di massa E per la creazione di incarichi e valutazioni del rischio ' +
-          "(record vivi che richiedono sempre la conferma umana). Restituisce un link alla pagina di " +
-          "approvazione: mostralo all'utente. All'approvazione l'app ESEGUE il piano automaticamente " +
-          "(un solo passo 'Approva ed esegui'): NON devi chiamare esegui_piano. Verifica l'esito con " +
-          'stato_piano. Nulla viene scritto finché l\'utente non approva.',
+          '(record vivi che richiedono sempre la conferma umana). RIFERIMENTI TRA PASSI: quando un passo ha ' +
+          "bisogno dell'UUID di un'entità creata in un passo PRECEDENTE dello STESSO piano (non ancora esistente), " +
+          'usa il token "@passo:N" (N = numero del passo, 1-based) al posto dell\'UUID. Es. un solo piano: ' +
+          '1) crea_bozza_cliente; 2) crea_incarico con cliente_id "@passo:1"; 3) crea_valutazione con incarico_id ' +
+          '"@passo:2". Così cliente+incarico+valutazione si creano con UNA sola approvazione, senza attendere gli id. ' +
+          "Restituisce un link alla pagina di approvazione: mostralo all'utente. All'approvazione l'app ESEGUE il " +
+          "piano automaticamente (un solo passo 'Approva ed esegui'): NON devi chiamare esegui_piano. Verifica " +
+          "l'esito con stato_piano. Nulla viene scritto finché l'utente non approva.",
         inputSchema: {
           titolo: z.string().optional().describe('Titolo descrittivo del piano (es. "Import 40 clienti di test").'),
           azioni: z.array(z.object({
@@ -684,7 +719,7 @@ export function buildMcpServer(
       tipologia: z.string().describe('Valore tipologia da descrivi_tipologie_documento.'),
       nome_file: z.string().min(1).describe('Nome file (verrà forzato a estensione .pdf).'),
       descrizione: z.string().optional().describe('Descrizione del documento.'),
-      data_scadenza: z.string().optional().describe('Data scadenza (ISO yyyy-mm-dd o dd/mm/yyyy); obbligatoria per alcune tipologie.'),
+      data_scadenza: z.string().optional().describe('Data scadenza (formato dd/mm/yyyy, es. 31/12/2026); obbligatoria per alcune tipologie.'),
       persona_id: z.string().optional().describe('UUID anagrafica (tipologie level persona).'),
       cliente_id: z.string().optional().describe('UUID cliente (tipologie level cliente).'),
       incarico_id: z.string().optional().describe('UUID incarico (tipologie level incarico).'),
@@ -820,7 +855,7 @@ export function buildMcpServer(
             staging_id: z.string().uuid().describe('UUID della riga di staging.'),
             tipologia: z.string().describe('Valore tipologia (da descrivi_tipologie_documento).'),
             descrizione: z.string().optional(),
-            data_scadenza: z.string().optional().describe('ISO yyyy-mm-dd o dd/mm/yyyy; obbligatoria per alcune tipologie.'),
+            data_scadenza: z.string().optional().describe('Formato dd/mm/yyyy (es. 31/12/2026); obbligatoria per alcune tipologie.'),
             persona_id: z.string().optional().describe('UUID anagrafica (level persona).'),
             cliente_id: z.string().optional().describe('UUID cliente (level cliente).'),
             incarico_id: z.string().optional().describe('UUID incarico (level incarico).'),
