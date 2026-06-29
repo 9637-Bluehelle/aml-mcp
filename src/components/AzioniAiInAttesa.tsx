@@ -35,7 +35,7 @@ interface PianoRow {
   id: string;
   titolo: string | null;
   azioni: unknown[];
-  status: 'pending' | 'approved' | 'rejected' | 'executing' | 'executed' | 'expired';
+  status: 'pending' | 'approved' | 'rejected' | 'executing' | 'executed' | 'expired' | 'failed';
   created_at: string;
   expires_at: string;
 }
@@ -47,6 +47,8 @@ const STATUS_BADGE: Record<PianoRow['status'], { label: string; cls: string }> =
   executing: { label: 'In esecuzione', cls: 'bg-blue-50 text-blue-700' },
   executed: { label: 'Eseguito', cls: 'bg-green-50 text-green-700' },
   expired: { label: 'Scaduto', cls: 'bg-gray-100 text-gray-500' },
+  // Approvato ma con azioni non scritte (errore in esecuzione): arancione scuro.
+  failed: { label: 'Errore esecuzione', cls: 'bg-orange-200 text-orange-900' },
 };
 
 function isScaduto(p: PianoRow): boolean {
