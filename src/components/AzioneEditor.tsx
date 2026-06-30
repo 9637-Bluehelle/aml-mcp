@@ -11,11 +11,7 @@ import { formatDateToISO, normalizeDate } from './cliente-wizard/utils';
 export type CampoTipo = 'text' | 'textarea' | 'date' | 'number' | 'bool' | 'score';
 export interface CampoEditabile { key: string; label: string; tipo: CampoTipo; gruppo?: string }
 
-// Mappa per tool dei campi sicuri (ordine = ordine di visualizzazione). Allineata ai costruttori
-// di righe in dettaglioAzioni.ts, ma SENZA gli UUID/associazioni. Le chiavi annidate (RT2) usano
-// la notazione con punto (es. "tabella_a.naturaGiuridica").
-const CAMPI: Record<string, CampoEditabile[]> = {
-  crea_bozza_cliente: [
+const CAMPI_BOZZA_CLIENTE: CampoEditabile[] = [
     { key: 'codice_cliente', label: 'Codice cliente', tipo: 'text', gruppo: 'Anagrafica' },
     // Persona fisica
     { key: 'nome_cognome_pf', label: 'Nome e cognome', tipo: 'text', gruppo: 'Anagrafica' },
@@ -57,7 +53,27 @@ const CAMPI: Record<string, CampoEditabile[]> = {
     { key: 'pep_prof', label: 'PEP', tipo: 'bool', gruppo: 'Verifiche' },
     { key: 'sanzioni_prof', label: 'In liste sanzioni', tipo: 'bool', gruppo: 'Verifiche' },
     { key: 'note_verifica_prof', label: 'Note di verifica', tipo: 'textarea', gruppo: 'Verifiche' },
-  ],
+  ];
+
+const CAMPI_INCARICO: CampoEditabile[] = [
+    { key: 'codice_incarico', label: 'Codice incarico', tipo: 'text' },
+    { key: 'descrizione', label: 'Descrizione', tipo: 'textarea' },
+    { key: 'scopo_natura', label: 'Scopo e natura', tipo: 'textarea' },
+    { key: 'data_inizio', label: 'Data inizio', tipo: 'date' },
+    { key: 'data_fine', label: 'Data fine', tipo: 'date' },
+    { key: 'importo_stimato', label: 'Importo stimato (€)', tipo: 'number' },
+    { key: 'relazioni_cliente_te', label: 'Relazioni cliente / TE', tipo: 'textarea' },
+    { key: 'provenienza_fondi', label: 'Provenienza fondi', tipo: 'text' },
+    { key: 'mezzi_pagamento', label: 'Mezzi di pagamento', tipo: 'text' },
+    { key: 'conferma_fondi_leciti', label: 'Conferma fondi leciti', tipo: 'bool' },
+  ];
+
+// Mappa per tool dei campi sicuri (ordine = ordine di visualizzazione). Allineata ai costruttori
+// di righe in dettaglioAzioni.ts, ma SENZA gli UUID/associazioni. Le chiavi annidate (RT2) usano
+// la notazione con punto (es. "tabella_a.naturaGiuridica").
+const CAMPI: Record<string, CampoEditabile[]> = {
+  crea_bozza_cliente: CAMPI_BOZZA_CLIENTE,
+  modifica_cliente: CAMPI_BOZZA_CLIENTE,
   crea_soggetto: [
     { key: 'nome_cognome', label: 'Nome / ragione sociale', tipo: 'text' },
     { key: 'codice_fiscale', label: 'Codice fiscale', tipo: 'text' },
@@ -73,18 +89,8 @@ const CAMPI: Record<string, CampoEditabile[]> = {
     { key: 'pep', label: 'PEP', tipo: 'bool' },
     { key: 'sanzioni', label: 'In liste sanzioni', tipo: 'bool' },
   ],
-  crea_incarico: [
-    { key: 'codice_incarico', label: 'Codice incarico', tipo: 'text' },
-    { key: 'descrizione', label: 'Descrizione', tipo: 'textarea' },
-    { key: 'scopo_natura', label: 'Scopo e natura', tipo: 'textarea' },
-    { key: 'data_inizio', label: 'Data inizio', tipo: 'date' },
-    { key: 'data_fine', label: 'Data fine', tipo: 'date' },
-    { key: 'importo_stimato', label: 'Importo stimato (€)', tipo: 'number' },
-    { key: 'relazioni_cliente_te', label: 'Relazioni cliente / TE', tipo: 'textarea' },
-    { key: 'provenienza_fondi', label: 'Provenienza fondi', tipo: 'text' },
-    { key: 'mezzi_pagamento', label: 'Mezzi di pagamento', tipo: 'text' },
-    { key: 'conferma_fondi_leciti', label: 'Conferma fondi leciti', tipo: 'bool' },
-  ],
+  crea_incarico: CAMPI_INCARICO,
+  modifica_incarico: CAMPI_INCARICO, 
   crea_valutazione: [
     { key: 'tabella_a.naturaGiuridica', label: 'Tab. A · Natura giuridica', tipo: 'score' },
     { key: 'tabella_a.attivitaPrevalente', label: 'Tab. A · Attività prevalente', tipo: 'score' },
