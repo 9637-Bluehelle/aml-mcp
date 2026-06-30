@@ -11,8 +11,10 @@ export interface RigaDettaglio { label: string; value: string; gruppo?: string }
 /** Etichetta leggibile di un tool di scrittura (azione di piano). */
 export const TOOL_LABEL: Record<string, string> = {
   crea_bozza_cliente: 'Crea bozza cliente',
+  modifica_cliente: 'Modifica cliente esistente',     // <-- nuovo
   crea_soggetto: 'Crea soggetto in anagrafica',
   crea_incarico: 'Crea incarico',
+  modifica_incarico: 'Modifica incarico esistente',   // <-- nuovo
   crea_valutazione: 'Crea valutazione del rischio (RT2)',
 };
 
@@ -21,6 +23,27 @@ export const TOOL_LABEL: Record<string, string> = {
  *  mai UUID grezzi ma codici/etichette leggibili. */
 export function riassuntoArgs(args: Record<string, any>, ctx?: ContestoNomi): string {
   const parts: string[] = [];
+
+  // Modifica incarico: mostra SEMPRE il riferimento al target, anche se il patch è minimo.
+  if (args.incarico_id && !args.tabella_a) {
+    const codiceIncarico = ctx?.incarichiInfo[args.incarico_id]?.codice;
+    parts.push(`incarico: ${codiceIncarico || args.incarico_id}`);
+    if (args.codice_incarico) parts.push(`nuovo codice: ${args.codice_incarico}`);
+    if (args.data_inizio) parts.push(`inizio: ${args.data_inizio}`);
+    if (args.importo_stimato !== undefined) parts.push(`importo: € ${args.importo_stimato}`);
+    return parts.join(' · ');
+  }
+
+  // Modifica cliente: mostra il cliente target, poi eventuali campi cambiati.
+  if (args.cliente_id) {
+    parts.push(`cliente: ${ctx?.clienteNomi[args.cliente_id] || args.cliente_id}`);
+    const nome = args.nome_cognome_pf || args.ragione_sociale || args.nome_cognome_prof;
+    if (nome) parts.push(String(nome));
+    if (args.rappresentante_legale) parts.push(`rappr.: ${args.rappresentante_legale}`);
+    if (Array.isArray(args.titolari_effettivi)) parts.push(`${args.titolari_effettivi.length} titolari`);
+    return parts.join(' · ');
+  }
+
   // Valutazione RT2: incarico + punteggi. Mostriamo il codice incarico (non l'UUID); se non
   // risolto, omettiamo del tutto il riferimento invece di esporre l'id tecnico.
   if (args.tabella_a) {
@@ -62,8 +85,19 @@ export function buildDettaglioAzione(
 ): { righe: RigaDettaglio[]; anteprima?: AnteprimaRT2 | null } {
   switch (tool) {
     case 'crea_bozza_cliente': return { righe: righeBozzaCliente(args) };
+    case 'modifica_cliente': {
+      const righe = righeBozzaCliente(args); // stessi campi, stesso formato
+      righe.unshift({ label: 'Cliente da modificare', value: ctx.clienteNomi[args.cliente_id] || args.cliente_id, gruppo: 'Anagrafica' });
+      return { righe };
+    }
     case 'crea_soggetto': return { righe: righeSoggetto(args) };
     case 'crea_incarico': return { righe: righeIncarico(args, { clienteNome: ctx.clienteNomi[args.cliente_id] }) };
+    case 'modifica_incarico': {
+      const inc = ctx.incarichiInfo[args.incarico_id];
+      const righe = righeIncarico(args, { clienteNome: args.cliente_id ? ctx.clienteNomi[args.cliente_id] : inc?.clienteNome });
+      righe.unshift({ label: 'Incarico da modificare', value: inc?.codice || args.incarico_id });
+      return { righe };
+    }
     case 'crea_valutazione': {
       const inc = ctx.incarichiInfo[args.incarico_id];
       return {
