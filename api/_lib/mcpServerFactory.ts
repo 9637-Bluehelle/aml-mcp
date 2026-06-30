@@ -12,6 +12,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { modificaClienteSchema, modificaIncaricoSchema } from './mcpTools.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { salvaCliente } from './clienteService.js';
 import { creaSoggettoWithClient } from './personeService.js';
@@ -522,6 +523,37 @@ export function buildMcpServer(
     );
 
     server.registerTool(
+      'modifica_cliente',
+      {
+        title: 'Modifica cliente esistente (proposta da approvare)',
+        description:
+          "Propone la MODIFICA di un cliente già esistente (cliente_id obbligatorio). PATCH PARZIALE: " +
+          "passa solo i campi da cambiare — quelli omessi restano invariati, COMPRESO 'titolari_effettivi' " +
+          "(se non lo passi, i titolari attuali NON vengono toccati; se lo passi, sostituisce l'intero elenco, " +
+          "quindi includi anche quelli esistenti che vuoi mantenere). NON scrive subito: crea una proposta che " +
+          "l'utente approva nella modale; dopo l'approvazione l'app esegue da sé. Usa leggi_cliente prima per " +
+          "vedere lo stato attuale.",
+        inputSchema: modificaClienteSchema,
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+      },
+      async (args) => {
+        try {
+          requireStudio();
+          const res = await proponiPiano(client, studioId, {
+            titolo: 'Modifica cliente',
+            azioni: [{ tool: 'modifica_cliente', args: args as Record<string, any> }],
+          });
+          return jsonResult({
+            ...res,
+            messaggio: `Proposta creata. Mostra il link all'utente: all'approvazione l'app eseguirà da sé. Verifica con stato_piano("${res.plan_id}"). Niente è ancora stato scritto.`,
+          });
+        } catch (e: any) {
+          return errorResult(`Proposta modifica cliente fallita: ${e?.message || String(e)}`);
+        }
+      },
+    );
+
+    server.registerTool(
       'crea_soggetto',
       {
         title: 'Crea soggetto in anagrafica',
@@ -577,6 +609,37 @@ export function buildMcpServer(
           });
         } catch (e: any) {
           return errorResult(`Proposta incarico fallita: ${e?.message || String(e)}`);
+        }
+      },
+    );
+
+    server.registerTool(
+      'modifica_incarico',
+      {
+        title: 'Modifica incarico esistente (proposta da approvare)',
+        description:
+          "Propone la MODIFICA di un incarico già esistente (incarico_id obbligatorio). PATCH PARZIALE: " +
+          "passa solo i campi da cambiare, quelli omessi restano invariati. Il codice_incarico NON viene " +
+          "mai rigenerato automaticamente: passalo solo se vuoi davvero cambiarlo. Spostare cliente_id è " +
+          "un'operazione delicata, usala solo se richiesto esplicitamente. NON scrive subito: crea una " +
+          "proposta che l'utente approva nella modale. Usa leggi_cliente/lista_incarichi prima per vedere " +
+          "lo stato attuale.",
+        inputSchema: modificaIncaricoSchema,
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+      },
+      async (args) => {
+        try {
+          requireStudio();
+          const res = await proponiPiano(client, studioId, {
+            titolo: 'Modifica incarico',
+            azioni: [{ tool: 'modifica_incarico', args: args as Record<string, any> }],
+          });
+          return jsonResult({
+            ...res,
+            messaggio: `Proposta creata. Mostra il link all'utente: all'approvazione l'app eseguirà da sé. Verifica con stato_piano("${res.plan_id}"). Niente è ancora stato scritto.`,
+          });
+        } catch (e: any) {
+          return errorResult(`Proposta modifica incarico fallita: ${e?.message || String(e)}`);
         }
       },
     );
