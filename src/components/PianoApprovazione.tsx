@@ -13,7 +13,7 @@ import { eseguiPiano } from '../../api/_lib/mcpPlans';
 import { DettaglioAzione, ContenutoDettaglio } from './DettaglioAzione';
 import { TOOL_LABEL, riassuntoArgs, buildDettaglioAzione, type ContestoNomi } from '../lib/dettaglioAzioni';
 import { risolviNomiAzioni } from '../lib/risolviAzioni';
-import { AzioneEditor, setArgPath, haCampiEditabili } from './AzioneEditor';
+import { AzioneEditor, setArgPath, haCampiEditabili, campiEditabiliPresenti } from './AzioneEditor';
 
 interface Azione { tool: string; args: Record<string, any>; }
 interface Piano {
@@ -338,13 +338,15 @@ export function PianoApprovazione({
                   <div className="text-sm font-medium text-gray-800">{i + 1}. {TOOL_LABEL[a.tool] || a.tool}</div>
                   <div className="text-xs text-gray-500 mt-0.5 break-words">{riassuntoArgs(a.args, nomi)}</div>
                   {editing ? (
-                    // In modifica mostriamo l'editor dei campi e — sotto — l'anteprima rischio RT2
-                    // ricalcolata in tempo reale dal draft, così l'utente vede subito l'impatto delle
-                    // modifiche ai punteggi (classe/rischio/periodicità) mentre li corregge.
                     (() => {
                       const d = buildDettaglioAzione(a.tool, a.args, nomi);
+                      const campiEditabili = new Set(campiEditabiliPresenti(a.tool, a.args).map((c) => c.label));
+                      // Righe di SOLA contestualizzazione: quelle che AzioneEditor non gestisce (riferimento al
+                      // record target, titolari effettivi). Restano visibili in lettura anche durante la modifica.
+                      const righeSoloLettura = d.righe.filter((r) => !campiEditabili.has(r.label));
                       return (
                         <div className="mt-2 space-y-2">
+                          {righeSoloLettura.length > 0 && <DettaglioAzione righe={righeSoloLettura} />}
                           <AzioneEditor tool={a.tool} args={a.args} onChange={(path, v) => setCampo(i, path, v)} />
                           {d.anteprima && <ContenutoDettaglio righe={[]} anteprima={d.anteprima} />}
                         </div>
