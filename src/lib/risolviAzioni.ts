@@ -14,8 +14,21 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const soloUuid = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
 
 export async function risolviNomiAzioni(azioni: Azione[]): Promise<ContestoNomi> {
-  const cliIds = azioni.filter((a) => a.tool === 'crea_incarico').map((a) => a.args?.cliente_id).filter(soloUuid);
-  const incIds = azioni.filter((a) => a.tool === 'crea_valutazione').map((a) => a.args?.incarico_id).filter(soloUuid);
+  const cliIds = azioni
+    .filter((a) => a.tool === 'crea_incarico' || a.tool === 'modifica_cliente')
+    .map((a) => a.args?.cliente_id)
+    .filter(soloUuid);
+
+  // modifica_incarico può portare anche un cliente_id (spostamento esplicito): va risolto come gli altri.
+  const cliIdsDaModificaIncarico = azioni
+    .filter((a) => a.tool === 'modifica_incarico')
+    .map((a) => a.args?.cliente_id)
+    .filter(soloUuid);
+
+  const incIds = azioni
+    .filter((a) => a.tool === 'crea_valutazione' || a.tool === 'modifica_incarico')
+    .map((a) => a.args?.incarico_id)
+    .filter(soloUuid);
 
   const incarichiInfo: ContestoNomi['incarichiInfo'] = {};
   const incClienteId: Record<string, string | null> = {};
@@ -32,7 +45,7 @@ export async function risolviNomiAzioni(azioni: Azione[]): Promise<ContestoNomi>
     });
   }
 
-  const allCli = [...new Set([...cliIds, ...extraCliIds])];
+  const allCli = [...new Set([...cliIds, ...cliIdsDaModificaIncarico, ...extraCliIds])];
   const clienteNomi: Record<string, string> = {};
   const pepById: Record<string, boolean> = {};
   if (allCli.length) {
