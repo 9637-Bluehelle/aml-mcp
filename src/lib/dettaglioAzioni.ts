@@ -158,17 +158,15 @@ export function righeBozzaCliente(a: Record<string, any>): RigaDettaglio[] {
   g('Sede e attività', 'Codice ATECO', a.codice_ateco_impresa);
   g('Sede e attività', 'Attività svolta', a.attivita_svolta_impresa);
   g('Rappresentante', 'Rappresentante legale', a.rappresentante_legale);
-  g('Rappresentante', 'CF rappresentante', a.codice_fiscale_rappresentante);
-  g('Verifiche', 'PEP', a.pep_impresa, boolLabel);
-  g('Verifiche', 'In liste sanzioni', a.sanzioni_impresa, boolLabel);
-  g('Verifiche', 'Note di verifica', a.note_verifica_impresa);
-  g('Rappresentante', 'Rappresentante legale', a.rappresentante_legale);
   g('Rappresentante', 'Tipo soggetto', a.tipo_soggetto_rappresentante);
   g('Rappresentante', 'CF rappresentante', a.codice_fiscale_rappresentante);
   g('Rappresentante', 'P.IVA rappresentante', a.partita_iva_rappresentante);
   g('Rappresentante', 'Data di nascita', a.data_nascita_rappresentante);  
   g('Rappresentante', 'Luogo di nascita', a.luogo_nascita_rappresentante);
   g('Rappresentante', 'Residenza', a.residenza_rappresentante);
+  g('Verifiche', 'PEP', a.pep_impresa, boolLabel);
+  g('Verifiche', 'In liste sanzioni', a.sanzioni_impresa, boolLabel);
+  g('Verifiche', 'Note di verifica', a.note_verifica_impresa);
   //titolari effettivi:
   if (Array.isArray(a.titolari_effettivi) && a.titolari_effettivi.length > 0) {
     a.titolari_effettivi.forEach((t: Record<string, any>, idx: number) => {
