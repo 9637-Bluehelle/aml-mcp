@@ -6,11 +6,11 @@
 // proposta e ri-eseguite con il client autenticato (RLS piena, audit source='ai').
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { salvaCliente } from './clienteService.js';
+import { salvaCliente, aggiornaCliente } from './clienteService.js';
 import { creaSoggettoWithClient } from './personeService.js';
-import { salvaIncarico, type IncaricoArgs } from './incaricoService.js';
+import { salvaIncarico, aggiornaIncarico, type IncaricoArgs } from './incaricoService.js';
 import { salvaValutazione, type ValutazioneArgs } from './valutazioneService.js';
-import { AZIONI_PIANO_SCHEMAS, mapArgsToWizardData, mapArgsToPersona } from './mcpTools.js';
+import { AZIONI_PIANO_SCHEMAS, mapArgsToWizardData, mapArgsToWizardDataPatch, mapArgsToPersona }  from './mcpTools.js';
 
 export interface AzionePiano {
   tool: string;
@@ -99,12 +99,22 @@ async function executeAzione(
     });
     return { ok: true, tool: azione.tool, id: r.cliente?.id ?? null };
   }
+  if (azione.tool === 'modifica_cliente') {
+    const { cliente_id, ...patchArgs } = azione.args;
+    const r = await aggiornaCliente(client, studioId, cliente_id, mapArgsToWizardDataPatch(patchArgs));
+    return { ok: true, tool: azione.tool, id: r.targetClienteId };
+  }
   if (azione.tool === 'crea_soggetto') {
     const r = await creaSoggettoWithClient(client, mapArgsToPersona(azione.args), studioId);
     return { ok: true, tool: azione.tool, id: r.id, created: r.created };
   }
   if (azione.tool === 'crea_incarico') {
     const r = await salvaIncarico(client, azione.args as IncaricoArgs, studioId);
+    return { ok: true, tool: azione.tool, id: r.incarico_id };
+  }
+  if (azione.tool === 'modifica_incarico') {
+    const { incarico_id, ...patch } = azione.args;
+    const r = await aggiornaIncarico(client, studioId, incarico_id, patch as Partial<IncaricoArgs>);
     return { ok: true, tool: azione.tool, id: r.incarico_id };
   }
   if (azione.tool === 'crea_valutazione') {
