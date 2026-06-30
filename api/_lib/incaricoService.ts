@@ -264,3 +264,93 @@ export async function salvaIncarico(
     status: data.status,
   };
 }
+
+export interface IncaricoPatch extends Partial<IncaricoArgs> {}
+
+/**
+ * Modifica un incarico ESISTENTE applicando un PATCH parziale: solo i campi presenti in `patch`
+ * vengono aggiornati, gli altri restano invariati. A differenza di salvaIncarico:
+ *  - NON rigenera mai codice_incarico (si tocca solo se esplicitamente fornito, e in tal caso va
+ *    verificata l'unicità);
+ *  - cliente_id, se cambiato, viene rivalidato (deve appartenere allo studio) — attenzione: questo
+ *    sposta l'incarico su un altro cliente, da usare con cautela (annotato come destructive lato tool);
+ *  - tipologia_prestazione_id, se cambiata, viene rivalidata contro il catalogo.
+ */
+export async function aggiornaIncarico(
+  client: SupabaseClient,
+  studioId: string | null,
+  incaricoId: string,
+  patch: IncaricoPatch,
+): Promise<{ incarico_id: string; codice_incarico: string; cliente_id: string; status: string }> {
+  if (!studioId) throw new Error('Studio non determinato: impossibile modificare l\'incarico.');
+  if (!incaricoId) throw new Error('incarico_id obbligatorio.');
+
+  const { data: current, error: curErr } = await client
+    .from('incarichi')
+    .select('id, cliente_id, codice_incarico, tipologia_prestazione_id, descrizione, scopo_natura, data_inizio, data_fine, importo_stimato, relazioni_cliente_te, provenienza_fondi, mezzi_pagamento, conferma_fondi_leciti, status')
+    .eq('id', incaricoId)
+    .eq('studio_id', studioId)
+    .maybeSingle();
+  if (curErr) throw new Error(curErr.message);
+  if (!current) throw new Error('Incarico non trovato nello studio: verifica incarico_id con lista_incarichi.');
+
+  const payload: Record<string, any> = {};
+
+  // cliente_id: solo se esplicitamente fornito e diverso — rivalida appartenenza allo studio.
+  if (patch.cliente_id && patch.cliente_id !== current.cliente_id) {
+    const { data: cliente } = await client
+      .from('clienti').select('id').eq('id', patch.cliente_id).eq('studio_id', studioId).maybeSingle();
+    if (!cliente) throw new Error('cliente_id non trovato nello studio: verifica con lista_clienti.');
+    payload.cliente_id = patch.cliente_id;
+  }
+
+  // tipologia_prestazione_id: rivalida contro il catalogo se cambiata.
+  if (patch.tipologia_prestazione_id && patch.tipologia_prestazione_id !== current.tipologia_prestazione_id) {
+    if (!getPrestazione(patch.tipologia_prestazione_id)) {
+      throw new Error(`tipologia_prestazione_id "${patch.tipologia_prestazione_id}" non valida. Usa descrivi_tipologie_prestazione.`);
+    }
+    payload.tipologia_prestazione_id = patch.tipologia_prestazione_id;
+  }
+
+  // codice_incarico: si tocca SOLO se fornito esplicitamente (mai rigenerato in edit).
+  if (patch.codice_incarico !== undefined && patch.codice_incarico.trim() && patch.codice_incarico.trim() !== current.codice_incarico) {
+    payload.codice_incarico = patch.codice_incarico.trim();
+  }
+
+  if (patch.descrizione !== undefined) payload.descrizione = patch.descrizione;
+  if (patch.scopo_natura !== undefined) payload.scopo_natura = patch.scopo_natura;
+  if (patch.data_inizio !== undefined) {
+    const d = formatDateForDB(patch.data_inizio);
+    if (!d) throw new Error(`data_inizio non valida ("${patch.data_inizio}"): usa il formato dd/mm/yyyy.`);
+    payload.data_inizio = d;
+  }
+  if (patch.data_fine !== undefined) {
+    payload.data_fine = patch.data_fine ? formatDateForDB(patch.data_fine) : null;
+  }
+  if (patch.importo_stimato !== undefined) payload.importo_stimato = patch.importo_stimato;
+  if (patch.relazioni_cliente_te !== undefined) payload.relazioni_cliente_te = patch.relazioni_cliente_te;
+  if (patch.provenienza_fondi !== undefined) payload.provenienza_fondi = patch.provenienza_fondi;
+  if (patch.mezzi_pagamento !== undefined) payload.mezzi_pagamento = patch.mezzi_pagamento;
+  if (patch.conferma_fondi_leciti !== undefined) payload.conferma_fondi_leciti = patch.conferma_fondi_leciti;
+
+  if (Object.keys(payload).length === 0) {
+    // Nessun campo da scrivere: ritorna lo stato attuale senza toccare il DB.
+    return { incarico_id: current.id, codice_incarico: current.codice_incarico, cliente_id: current.cliente_id, status: current.status };
+  }
+
+  const { data, error } = await client
+    .from('incarichi')
+    .update(payload)
+    .eq('id', incaricoId)
+    .eq('studio_id', studioId)
+    .select('id, codice_incarico, cliente_id, status')
+    .single();
+  if (error) {
+    if (/duplicate key|unique/i.test(error.message)) {
+      throw new Error(`Codice incarico "${payload.codice_incarico}" già esistente: scegline uno diverso.`);
+    }
+    throw new Error(error.message);
+  }
+
+  return { incarico_id: data.id, codice_incarico: data.codice_incarico, cliente_id: data.cliente_id, status: data.status };
+}
