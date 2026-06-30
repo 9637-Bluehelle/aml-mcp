@@ -339,6 +339,7 @@ export function PianoApprovazione({
                   <div className="text-xs text-gray-500 mt-0.5 break-words">{riassuntoArgs(a.args, nomi)}</div>
                   {editing ? (
                     (() => {
+                      console.log('DEBUG', a.tool, a.args); // temporaneo
                       const d = buildDettaglioAzione(a.tool, a.args, nomi);
                       const campiEditabili = new Set(campiEditabiliPresenti(a.tool, a.args).map((c) => c.label));
                       // Righe di SOLA contestualizzazione: quelle che AzioneEditor non gestisce (riferimento al
