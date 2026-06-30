@@ -650,3 +650,147 @@ export async function salvaCliente(
     isEditMode,
   };
 }
+
+// Aggiungi in fondo al file (richiede gli stessi import già presenti)
+
+/** Ricostruisce un WizardData "corrente" leggendo il cliente + rappresentante + titolari dal DB.
+ *  Serve come base per applicare un PATCH parziale senza perdere i dati non toccati dall'AI. */
+async function loadWizardDataFromCliente(
+  client: SupabaseClient,
+  studioId: string,
+  clienteId: string,
+): Promise<WizardData> {
+  const { data: c, error } = await client
+    .from('clienti').select('*').eq('id', clienteId).eq('studio_id', studioId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!c) throw new Error('Cliente non trovato nello studio: verifica cliente_id con lista_clienti.');
+
+  const tipo = c.tipo_cliente as WizardData['tipo_cliente'];
+  const base: any = { tipo_cliente: tipo, codice_cliente: c.codice_cliente, titolari_effettivi: [] };
+
+  if (tipo === 'persona_fisica') {
+    Object.assign(base, {
+      nome_cognome_pf: c.ragione_sociale || '', codice_fiscale_pf: c.codice_fiscale || '',
+      data_nascita_pf: c.data_nascita || '', luogo_nascita_pf: c.luogo_nascita || '',
+      provincia_nascita_pf: c.provincia_nascita || '', nazionalita_pf: c.nazionalita || 'Italiana',
+      professione_pf: c.professione || '', residenza_pf: c.residenza || '',
+      documento_pf: c.documento_identita || null,
+      pep_pf: c.pep || false, pep_verificato_pf: c.pep_verificato || false,
+      pep_data_verifica_pf: c.pep_data_verifica || '', pep_fonte_verifica_pf: c.pep_fonte_verifica || '',
+      sanzioni_pf: c.sanzioni || false, sanzioni_verificato_pf: c.sanzioni_verificato || false,
+      sanzioni_data_verifica_pf: c.sanzioni_data_verifica || '', sanzioni_fonte_verifica_pf: c.sanzioni_fonte_verifica || '',
+      note_verifica_pf: c.note_verifica || '',
+    });
+  } else if (tipo === 'professionista') {
+    Object.assign(base, {
+      nome_cognome_prof: c.ragione_sociale || '', codice_fiscale_prof: c.codice_fiscale || '',
+      partita_iva_prof: c.partita_iva || '', data_nascita_prof: c.data_nascita || '',
+      luogo_nascita_prof: c.luogo_nascita || '', provincia_nascita_prof: c.provincia_nascita || '',
+      nazionalita_prof: c.nazionalita || 'Italiana', professione_prof: c.professione || '',
+      residenza_prof: c.residenza || '', documento_prof: c.documento_identita || null,
+      codice_ateco_prof: c.codice_ateco || '', attivita_svolta_prof: c.attivita_svolta || '',
+      codice_rae_prof: c.codice_rae || '', descrizione_rae_prof: c.descrizione_rae || '',
+      pep_prof: c.pep || false, pep_verificato_prof: c.pep_verificato || false,
+      pep_data_verifica_prof: c.pep_data_verifica || '', pep_fonte_verifica_prof: c.pep_fonte_verifica || '',
+      sanzioni_prof: c.sanzioni || false, sanzioni_verificato_prof: c.sanzioni_verificato || false,
+      sanzioni_data_verifica_prof: c.sanzioni_data_verifica || '', sanzioni_fonte_verifica_prof: c.sanzioni_fonte_verifica || '',
+      note_verifica_prof: c.note_verifica || '',
+    });
+  } else if (tipo === 'impresa') {
+    let rappr: any = null;
+    if (c.rappresentante_persona_id) {
+      const { data: r } = await client.from('anagrafica_soggetti').select('*').eq('id', c.rappresentante_persona_id).maybeSingle();
+      rappr = r;
+    }
+    Object.assign(base, {
+      ragione_sociale: c.ragione_sociale || '', natura_giuridica: c.natura_giuridica || '',
+      partita_iva_impresa: c.partita_iva || '', codice_fiscale_impresa: c.codice_fiscale || '',
+      paese: c.paese || '', indirizzo: c.indirizzo || '',
+      codice_ateco_impresa: c.codice_ateco || '', attivita_svolta_impresa: c.attivita_svolta || '',
+      codice_rae_impresa: c.codice_rae || '', descrizione_rae_impresa: c.descrizione_rae || '',
+      rappresentante_legale: rappr?.nome_cognome || '',
+      tipo_soggetto_rappresentante: rappr?.tipo_soggetto || 'persona_fisica',
+      codice_fiscale_rappresentante: rappr?.codice_fiscale || '',
+      data_nascita_rappresentante: rappr?.data_nascita || '',
+      luogo_nascita_rappresentante: rappr?.luogo_nascita || '',
+      provincia_nascita_rappresentante: rappr?.provincia_nascita || '',
+      nazionalita_rappresentante: rappr?.nazionalita || 'Italiana',
+      residenza_rappresentante: rappr?.residenza || '',
+      partita_iva_rappresentante: rappr?.partita_iva || '',
+      natura_giuridica_rappresentante: rappr?.natura_giuridica || '',
+      codice_ateco_rappresentante: rappr?.codice_ateco || '',
+      documento_rappresentante: rappr ? {
+        tipo: rappr.documento_tipo || '', numero: rappr.documento_numero || '',
+        data_rilascio: rappr.documento_data_rilascio || '', data_scadenza: rappr.documento_data_scadenza || '',
+        ente_rilascio: rappr.documento_ente_rilascio || '',
+      } : null,
+      pep_impresa: c.pep || false, pep_verificato_impresa: c.pep_verificato || false,
+      pep_carica_impresa: rappr?.pep_carica || '',
+      pep_data_verifica_impresa: c.pep_data_verifica || '', pep_fonte_verifica_impresa: c.pep_fonte_verifica || '',
+      sanzioni_impresa: c.sanzioni || false, sanzioni_verificato_impresa: c.sanzioni_verificato || false,
+      sanzioni_data_verifica_impresa: c.sanzioni_data_verifica || '', sanzioni_fonte_verifica_impresa: c.sanzioni_fonte_verifica || '',
+      note_verifica_impresa: c.note_verifica || '',
+    });
+
+    const { data: titRows } = await client.from('titolari_effettivi').select('*').eq('cliente_id', clienteId);
+    if (titRows && titRows.length) {
+      const personaIds = titRows.map((t: any) => t.persona_id).filter(Boolean);
+      const { data: persone } = personaIds.length
+        ? await client.from('anagrafica_soggetti').select('*').in('id', personaIds)
+        : { data: [] as any[] };
+      const byId = new Map((persone || []).map((p: any) => [p.id, p]));
+      base.titolari_effettivi = titRows.map((t: any) => {
+        const p = t.persona_id ? byId.get(t.persona_id) : null;
+        return {
+          tipo_rapporto: t.tipo_rapporto || 'in_proprio',
+          tipo_soggetto: p?.tipo_soggetto || 'persona_fisica',
+          nome_cognome: p?.nome_cognome || '', professione: p?.professione || '',
+          ruolo: t.ruolo || '', comune_nascita: p?.luogo_nascita || '',
+          provincia_nascita: p?.provincia_nascita || '', data_nascita: p?.data_nascita || '',
+          nazionalita: p?.nazionalita || 'Italiana', residenza: p?.residenza || '',
+          codice_fiscale: p?.codice_fiscale || '', partita_iva: p?.partita_iva || '',
+          natura_giuridica: p?.natura_giuridica || '', codice_ateco: p?.codice_ateco || '',
+          documento_tipo: p?.documento_tipo || '', documento_numero: p?.documento_numero || '',
+          documento_rilascio_ente: p?.documento_ente_rilascio || '',
+          documento_rilascio_data: p?.documento_data_rilascio || '',
+          documento_scadenza: p?.documento_data_scadenza || '',
+          is_pep: t.is_pep ?? p?.pep ?? false, pep_carica: t.pep_carica || p?.pep_carica || '',
+          sanzioni: p?.sanzioni ?? false, note_quota: t.note_quota || '',
+        };
+      });
+    }
+  }
+  return base as WizardData;
+}
+
+/**
+ * Modifica un cliente ESISTENTE applicando un PATCH parziale: solo i campi presenti in `patch`
+ * sovrascrivono i valori correnti (i campi omessi restano invariati — incluso `titolari_effettivi`
+ * se l'array non viene passato, così l'AI può aggiungere il rappresentante senza cancellare i
+ * titolari già censiti, o viceversa). Usato da `modifica_cliente` (MCP) e riusabile dalla UI.
+ */
+export async function aggiornaCliente(
+  client: SupabaseClient,
+  studioId: string | null,
+  clienteId: string,
+  patch: Record<string, unknown>,
+  opts: { log?: (m: string, d?: unknown) => void; userLog?: (m: string) => void } = {},
+): Promise<SalvaClienteResult> {
+  if (!studioId) throw new Error('Studio non determinato: impossibile modificare il cliente.');
+  if (!clienteId) throw new Error('cliente_id obbligatorio.');
+
+  const current = await loadWizardDataFromCliente(client, studioId, clienteId);
+
+  const merged: any = { ...current };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined) merged[k] = v;
+  }
+
+  const { data: row } = await client.from('clienti').select('status').eq('id', clienteId).maybeSingle();
+  const isComplete = row?.status === 'active'; // mantiene lo status attuale, non lo deduce da zero
+
+  return salvaCliente(client, merged as WizardData, {
+    clienteId, isComplete, activeStudioId: studioId, log: opts.log, userLog: opts.userLog,
+  });
+}
+
