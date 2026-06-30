@@ -132,7 +132,7 @@ export const creaBozzaClienteSchema = {
 
 /** Normalizza un titolare effettivo proposto dall'AI in TitolareEffettivo completo (default sui
  *  campi mancanti, come emptyTitolare lato wizard). I documenti d'identità non sono gestiti via MCP. */
-function mapArgToTitolare(t: Record<string, any>): TitolareEffettivo {
+export function mapArgToTitolare(t: Record<string, any>): TitolareEffettivo {
   return {
     tipo_rapporto: t.tipo_rapporto || 'in_proprio',
     tipo_soggetto: t.tipo_soggetto || 'persona_fisica',
@@ -206,6 +206,26 @@ export const creaIncaricoSchema = {
   conferma_fondi_leciti: z.boolean().optional().describe('Conferma che i fondi sono leciti (default true).'),
 };
 
+export const modificaIncaricoSchema = {
+  incarico_id: uuidOrPassoRef('dell\'incarico')
+    .describe('UUID dell\'incarico esistente da modificare (da lista_incarichi).'),
+  cliente_id: uuidOrPassoRef('del cliente').optional()
+    .describe('Nuovo cliente_id, SOLO se vuoi spostare l\'incarico su un altro cliente (operazione delicata: di norma ometti questo campo).'),
+  tipologia_prestazione_id: z.string().optional()
+    .describe('Nuova tipologia di prestazione (da descrivi_tipologie_prestazione). Ometti per non cambiarla.'),
+  codice_incarico: z.string().optional()
+    .describe('Nuovo codice incarico. Ometti per NON cambiarlo (non viene mai rigenerato in modifica).'),
+  descrizione: z.string().optional().describe('Descrizione libera dell\'incarico.'),
+  scopo_natura: z.string().optional().describe('Scopo e natura della prestazione professionale.'),
+  data_inizio: z.string().optional().describe('Data di inizio (formato dd/mm/yyyy).'),
+  data_fine: z.string().optional().describe('Data di fine (formato dd/mm/yyyy). Passa stringa vuota per azzerarla.'),
+  importo_stimato: z.number().optional().describe('Importo stimato della prestazione.'),
+  relazioni_cliente_te: z.string().optional().describe('AV.4 — relazioni col cliente / titolare effettivo.'),
+  provenienza_fondi: z.string().optional().describe('Informazioni sulla provenienza dei fondi.'),
+  mezzi_pagamento: z.string().optional().describe('Mezzi di pagamento utilizzati.'),
+  conferma_fondi_leciti: z.boolean().optional().describe('Conferma che i fondi sono leciti.'),
+};
+
 // --- Schema input di `crea_valutazione` (RT2), condiviso tra factory ed esecutore piani. ---
 // L'AI fornisce i punteggi 1-4; il server calcola rischio/classe/misure/scadenza. Di norma i
 // punteggi li indica l'utente: chiedili prima di proporre, salvo l'utente chieda esplicitamente
@@ -255,13 +275,38 @@ export function mapArgsToPersona(args: Record<string, any>): PersonaFisicaRecord
   };
 }
 
+
+// dopo creaBozzaClienteSchema:
+export const modificaClienteSchema = {
+  cliente_id: uuidOrPassoRef('del cliente')
+    .describe('UUID del cliente esistente da modificare (da lista_clienti/leggi_cliente).'),
+  ...Object.fromEntries(
+    Object.entries(creaBozzaClienteSchema).map(([k, v]) =>
+      k === 'tipo_cliente' || k === 'codice_cliente' ? [k, (v as any).optional()] : [k, v],
+    ),
+  ),
+};
+
+/** Patch parziale: a differenza di mapArgsToWizardData, NON forza titolari_effettivi a [] se
+ *  l'AI non lo passa — fondamentale per non cancellare i titolari esistenti in modifica_cliente. */
+export function mapArgsToWizardDataPatch(args: Record<string, unknown>): Partial<WizardData> {
+  const { cliente_id, titolari_effettivi, ...rest } = args as Record<string, any>;
+  const patch: Record<string, any> = { ...rest };
+  if (titolari_effettivi !== undefined) {
+    patch.titolari_effettivi = Array.isArray(titolari_effettivi) ? titolari_effettivi.map(mapArgToTitolare) : [];
+  }
+  return patch as Partial<WizardData>;
+}
+
 /**
  * Tool di scrittura che possono comparire in un piano (`proponi_piano`). Per ciascuno, lo schema
  * Zod (oggetto) con cui validare gli `args` server-side prima di salvare il piano (§7.3).
  */
 export const AZIONI_PIANO_SCHEMAS: Record<string, z.ZodTypeAny> = {
   crea_bozza_cliente: z.object(creaBozzaClienteSchema),
+  modifica_cliente: z.object(modificaClienteSchema),   // <-- nuovo
   crea_soggetto: z.object(creaSoggettoSchema),
   crea_incarico: z.object(creaIncaricoSchema),
+  modifica_incarico: z.object(modificaIncaricoSchema),
   crea_valutazione: z.object(creaValutazioneSchema),
 };
