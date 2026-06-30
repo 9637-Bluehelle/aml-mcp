@@ -86,16 +86,23 @@ export function buildDettaglioAzione(
   switch (tool) {
     case 'crea_bozza_cliente': return { righe: righeBozzaCliente(args) };
     case 'modifica_cliente': {
-      const righe = righeBozzaCliente(args); // stessi campi, stesso formato
-      righe.unshift({ label: 'Cliente da modificare', value: ctx.clienteNomi[args.cliente_id] || args.cliente_id, gruppo: 'Anagrafica' });
+      const righe = righeBozzaCliente(args);
+      righe.unshift({
+        label: 'Cliente da modificare',
+        value: ctx.clienteNomi[args.cliente_id] || args.cliente_id,
+        gruppo: 'Anagrafica',
+      });
       return { righe };
-    }
+    };
     case 'crea_soggetto': return { righe: righeSoggetto(args) };
     case 'crea_incarico': return { righe: righeIncarico(args, { clienteNome: ctx.clienteNomi[args.cliente_id] }) };
     case 'modifica_incarico': {
       const inc = ctx.incarichiInfo[args.incarico_id];
-      const righe = righeIncarico(args, { clienteNome: args.cliente_id ? ctx.clienteNomi[args.cliente_id] : inc?.clienteNome });
-      righe.unshift({ label: 'Incarico da modificare', value: inc?.codice || args.incarico_id });
+      const righe = righeModificaIncarico(args, {
+        incaricoCodice: inc?.codice,
+        clienteNomeAttuale: inc?.clienteNome,
+        nuovoClienteNome: args.cliente_id ? ctx.clienteNomi[args.cliente_id] : undefined,
+      });
       return { righe };
     }
     case 'crea_valutazione': {
@@ -155,6 +162,27 @@ export function righeBozzaCliente(a: Record<string, any>): RigaDettaglio[] {
   g('Verifiche', 'PEP', a.pep_impresa, boolLabel);
   g('Verifiche', 'In liste sanzioni', a.sanzioni_impresa, boolLabel);
   g('Verifiche', 'Note di verifica', a.note_verifica_impresa);
+  g('Rappresentante', 'Rappresentante legale', a.rappresentante_legale);
+  g('Rappresentante', 'Tipo soggetto', a.tipo_soggetto_rappresentante);
+  g('Rappresentante', 'CF rappresentante', a.codice_fiscale_rappresentante);
+  g('Rappresentante', 'P.IVA rappresentante', a.partita_iva_rappresentante);
+  g('Rappresentante', 'Data di nascita', a.data_nascita_rappresentante);  
+  g('Rappresentante', 'Luogo di nascita', a.luogo_nascita_rappresentante);
+  g('Rappresentante', 'Residenza', a.residenza_rappresentante);
+  //titolari effettivi:
+  if (Array.isArray(a.titolari_effettivi) && a.titolari_effettivi.length > 0) {
+    a.titolari_effettivi.forEach((t: Record<string, any>, idx: number) => {
+      const label = `Titolare ${idx + 1}`;
+      const dettagli = [
+        t.nome_cognome,
+        t.ruolo,
+        t.note_quota ? `quota: ${t.note_quota}` : null,
+        t.codice_fiscale ? `CF: ${t.codice_fiscale}` : null,
+        t.is_pep ? 'PEP' : null,
+      ].filter(Boolean).join(' · ');
+      if (dettagli) r.push({ label, value: dettagli, gruppo: 'Titolari effettivi' });
+    });
+  };
   // Professionista
   g('Anagrafica', 'Nome e cognome', a.nome_cognome_prof);
   g('Anagrafica', 'Codice fiscale', a.codice_fiscale_prof);
@@ -199,6 +227,34 @@ export function righeIncarico(a: Record<string, any>, ctx: { clienteNome?: strin
   const prest = getPrestazione(a.tipologia_prestazione_id);
   add(r, 'Prestazione', prest ? `${prest.label} (rischio inerente ${prest.inherentRisk})` : a.tipologia_prestazione_id);
   add(r, 'Codice incarico', a.codice_incarico || 'generato automaticamente');
+  add(r, 'Descrizione', a.descrizione);
+  add(r, 'Scopo e natura', a.scopo_natura);
+  add(r, 'Data inizio', a.data_inizio);
+  add(r, 'Data fine', a.data_fine);
+  add(r, 'Importo stimato', a.importo_stimato, (v) => `€ ${v}`);
+  add(r, 'Relazioni cliente / TE', a.relazioni_cliente_te);
+  add(r, 'Provenienza fondi', a.provenienza_fondi);
+  add(r, 'Mezzi di pagamento', a.mezzi_pagamento);
+  add(r, 'Conferma fondi leciti', a.conferma_fondi_leciti, boolLabel);
+  return r;
+}
+
+// ----------------------------------------------------------------- modifica_incarico
+export function righeModificaIncarico(
+  a: Record<string, any>,
+  ctx: { incaricoCodice?: string; clienteNomeAttuale?: string; nuovoClienteNome?: string },
+): RigaDettaglio[] {
+  const r: RigaDettaglio[] = [];
+  add(r, 'Incarico da modificare', ctx.incaricoCodice || a.incarico_id || '(non risolto)');
+  add(r, 'Cliente attuale', ctx.clienteNomeAttuale);
+  // "Nuovo cliente" compare SOLO se il patch lo cambia davvero (spostamento esplicito).
+  if (a.cliente_id) add(r, 'Nuovo cliente (spostamento)', ctx.nuovoClienteNome || a.cliente_id);
+  if (a.tipologia_prestazione_id) {
+    const prest = getPrestazione(a.tipologia_prestazione_id);
+    add(r, 'Nuova prestazione', prest ? `${prest.label} (rischio inerente ${prest.inherentRisk})` : a.tipologia_prestazione_id);
+  }
+  // Codice incarico: NESSUN fallback "generato automaticamente" — qui non viene mai rigenerato.
+  add(r, 'Nuovo codice incarico', a.codice_incarico);
   add(r, 'Descrizione', a.descrizione);
   add(r, 'Scopo e natura', a.scopo_natura);
   add(r, 'Data inizio', a.data_inizio);
