@@ -13,7 +13,7 @@ import { eseguiPiano } from '../../api/_lib/mcpPlans';
 import { DettaglioAzione, ContenutoDettaglio } from './DettaglioAzione';
 import { TOOL_LABEL, riassuntoArgs, buildDettaglioAzione, type ContestoNomi } from '../lib/dettaglioAzioni';
 import { risolviNomiAzioni } from '../lib/risolviAzioni';
-import { AzioneEditor, setArgPath, haCampiEditabili, campiEditabiliPresenti } from './AzioneEditor';
+import { AzioneEditor, setArgPath, haCampiEditabili } from './AzioneEditor';
 
 interface Azione { tool: string; args: Record<string, any>; }
 interface Piano {
@@ -122,7 +122,7 @@ export function PianoApprovazione({
   const [draft, setDraft] = useState<Azione[] | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   // Nomi risolti per il dettaglio (privacy: mostriamo nomi, non UUID).
-  const [nomi, setNomi] = useState<ContestoNomi>({ clienteNomi: {}, clienteCodici: {}, incarichiInfo: {} });
+  const [nomi, setNomi] = useState<ContestoNomi>({ clienteNomi: {}, clienteCodici: {}, clienteTipi: {}, incarichiInfo: {} });
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -215,11 +215,17 @@ export function PianoApprovazione({
     if (!piano) return;
     const azioniPrecompilate = (piano.azioni ?? []).map((a) => {
       if (a.tool === 'modifica_cliente' && a.args.cliente_id) {
+        const tipo = nomi.clienteTipi[a.args.cliente_id] || 'impresa';
+        const nomeField =
+          tipo === 'persona_fisica' ? 'nome_cognome_pf' :
+          tipo === 'professionista' ? 'nome_cognome_prof' :
+          'ragione_sociale';
         return {
           ...a,
           args: {
             codice_cliente: nomi.clienteCodici[a.args.cliente_id] || '',
-            ...a.args, // i campi dell'AI sovrascrivono il default se già presenti
+            [nomeField]: nomi.clienteNomi[a.args.cliente_id] || '',
+            ...a.args, // i campi già passati dall'AI hanno precedenza
           },
         };
       }
@@ -354,10 +360,6 @@ export function PianoApprovazione({
                   {editing ? (
                     (() => {
                       const d = buildDettaglioAzione(a.tool, a.args, nomi);
-                      //const campiEditabili = new Set(campiEditabiliPresenti(a.tool, a.args).map((c) => c.label));
-                      // Righe di SOLA contestualizzazione: quelle che AzioneEditor non gestisce (riferimento al
-                      // record target, titolari effettivi). Restano visibili in lettura anche durante la modifica.
-                      //const righeSoloLettura = d.righe.filter((r) => !campiEditabili.has(r.label));
                       return (
                         <div className="mt-2 space-y-2">
                           <AzioneEditor tool={a.tool} args={a.args} onChange={(path, v) => setCampo(i, path, v)} />
