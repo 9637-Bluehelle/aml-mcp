@@ -122,12 +122,7 @@ export function setArgPath(args: Record<string, any>, path: string, value: any):
 }
 // Campi da mostrare sempre nell'editor anche se assenti negli args (l'utente potrebbe volerli compilare).
 const CAMPI_SEMPRE_VISIBILI: Partial<Record<string, Set<string>>> = {
-  modifica_cliente: new Set([
-    'codice_cliente',
-    'ragione_sociale',       
-    'nome_cognome_pf',     
-    'nome_cognome_prof',     
-  ]),
+  modifica_cliente: new Set(['codice_cliente']),
 };
 
 export function campiEditabiliPresenti(tool: string, args: Record<string, any>): CampoEditabile[] {
