@@ -356,7 +356,7 @@ export function AccessoMcpSettings() {
       </div>
  
       {/* Token di accesso — feature avanzata, raramente necessaria: collassata di default. */}
-      <div className="border border-gray-200 rounded-lg">
+      {/*<div className="border border-gray-200 rounded-lg">
         <button
           onClick={() => setTokensOpen((o) => !o)}
           className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
@@ -394,7 +394,7 @@ export function AccessoMcpSettings() {
               </div>
             ) : (
               <>
-                {/* PAT appena creato (mostrato una sola volta) */}
+                {/* PAT appena creato (mostrato una sola volta) *
                 {newPat && (
                   <div className="border border-green-200 bg-green-50 rounded-lg p-4 space-y-3">
                     <div className="flex items-center gap-2 text-green-800 font-medium text-sm">
@@ -416,7 +416,7 @@ export function AccessoMcpSettings() {
                   </div>
                 )}
  
-                {/* Form creazione */}
+                /* Form creazione *
                 <div className="border border-gray-200 rounded-lg p-4 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="sm:col-span-1">
@@ -461,7 +461,7 @@ export function AccessoMcpSettings() {
                   </button>
                 </div>
  
-                {/* Configurazione manuale a token, per client non-OAuth. */}
+                /* Configurazione manuale a token, per client non-OAuth. *
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-2">
                   <div className="font-medium text-gray-700">Configurare un client con un token</div>
                   <ol className="list-decimal pl-5 space-y-1">
@@ -475,7 +475,7 @@ export function AccessoMcpSettings() {
                   </p>
                 </div>
  
-                {/* Lista token */}
+                /* Lista token *
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-semibold text-gray-700">Token esistenti</h4>
@@ -526,7 +526,7 @@ export function AccessoMcpSettings() {
             )}
           </div>
         )}
-      </div>
+      </div>*/}
     </div>
   );
 }
