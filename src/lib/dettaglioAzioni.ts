@@ -89,16 +89,10 @@ export function buildDettaglioAzione(
     case 'crea_bozza_cliente': return { righe: righeBozzaCliente(args) };
     case 'modifica_cliente': {
       const righe = righeBozzaCliente(args);
-      righe.unshift({
-        label: 'Cliente da modificare',
-        value: ctx.clienteNomi[args.cliente_id] || args.cliente_id,
-        gruppo: 'Anagrafica',
-      },
-      { label: 'Codice cliente', 
-        value: ctx.clienteCodici?.[args.cliente_id] || '',
-        gruppo: 'Anagrafica' 
-      }
-    );
+      righe.unshift(
+        { label: 'Codice cliente', value: ctx.clienteCodici?.[args.cliente_id] || '', gruppo: 'Anagrafica' },
+        { label: 'Cliente da modificare', value: ctx.clienteNomi[args.cliente_id] || args.cliente_id, gruppo: 'Anagrafica' },
+      );
       return { righe };
     };
     case 'crea_soggetto': return { righe: righeSoggetto(args) };
