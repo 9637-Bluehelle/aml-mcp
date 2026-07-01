@@ -5,14 +5,14 @@
 // hashing del server, su mcp_access_tokens). Mostra anche l'URL endpoint e uno snippet di config.
 //
 // Self-contained: gestisce il proprio stato, non tocca il dirty-tracking di Impostazioni.
-
+ 
 import { useState, useEffect, useCallback } from 'react';
 import { Key, Plus, Trash2, Copy, ShieldCheck, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, PlusIcon, MoreHorizontal } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from './Toast';
-
+ 
 type Tier = 'read' | 'draft' | 'modify';
-
+ 
 interface TokenRow {
   id: string;
   label: string | null;
@@ -22,7 +22,7 @@ interface TokenRow {
   revoked_at: string | null;
   last_used_at: string | null;
 }
-
+ 
 interface ConnRow {
   token_hash: string;
   tier: Tier;
@@ -31,18 +31,18 @@ interface ConnRow {
   last_used_at: string | null;
   expires_at: string;
 }
-
+ 
 const TIER_LABEL: Record<Tier, string> = {
   read: 'Sola lettura',
   draft: 'Crea bozze',
   modify: 'Modifica (avanzato)',
 };
-
+ 
 async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
-
+ 
 function generaPat(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -51,7 +51,7 @@ function generaPat(): string {
   const b64 = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   return `aml_pat_${b64}`;
 }
-
+ 
 function fmtDate(s: string | null): string {
   if (!s) return '—';
   try {
@@ -60,28 +60,34 @@ function fmtDate(s: string | null): string {
     return s;
   }
 }
-
+ 
 export function AccessoMcpSettings() {
   const toast = useToast();
   const [tokens, setTokens] = useState<TokenRow[]>([]);
   const [conns, setConns] = useState<ConnRow[]>([]);
   const [connBusy, setConnBusy] = useState<string | null>(null); // token_hash dell'azione in corso
+  const [revokingId, setRevokingId] = useState<string | null>(null); // id del PAT in fase di revoca
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // reload successivi: non nasconde la lista già mostrata
   const [tableMissing, setTableMissing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [tokensOpen, setTokensOpen] = useState(false); // sezione token collassata: feature avanzata, rara
   const [desktopOpen, setDesktopOpen] = useState(false); // guida connettore Claude Desktop (consigliata)
-
+ 
   const [label, setLabel] = useState('');
   const [tier, setTier] = useState<Tier>('draft');
   const [ttlDays, setTtlDays] = useState<number | ''>(30);
-
+ 
   const [newPat, setNewPat] = useState<string | null>(null);
-
+ 
   const endpointUrl = `${window.location.origin}/api/mcp`;
-
-  const reload = useCallback(async () => {
-    setLoading(true);
+ 
+  const reload = useCallback(async (background = false) => {
+    if (background) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     const { data, error } = await supabase
       .from('mcp_access_tokens')
       .select('id, label, tier, created_at, expires_at, revoked_at, last_used_at')
@@ -93,7 +99,7 @@ export function AccessoMcpSettings() {
       setTableMissing(false);
       setTokens((data as TokenRow[]) ?? []);
     }
-
+ 
     // Connessioni OAuth attive (connettore Claude): refresh token non revocati e non scaduti. La
     // rotazione oraria mantiene UNA riga attiva per concessione; le revocate/scadute sono storia e
     // non si mostrano. Indipendente dalla tabella PAT: se manca solo questa, l'elenco resta vuoto.
@@ -104,12 +110,16 @@ export function AccessoMcpSettings() {
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
     setConns((connData as ConnRow[]) ?? []);
-
-    setLoading(false);
+ 
+    if (background) {
+      setRefreshing(false);
+    } else {
+      setLoading(false);
+    }
   }, []);
-
+ 
   useEffect(() => { reload(); }, [reload]);
-
+ 
   async function handleCreate() {
     setCreating(true);
     try {
@@ -123,7 +133,7 @@ export function AccessoMcpSettings() {
       const expires_at = ttlDays && Number(ttlDays) > 0
         ? new Date(Date.now() + Number(ttlDays) * 86_400_000).toISOString()
         : null;
-
+ 
       const { error } = await supabase.from('mcp_access_tokens').insert({
         user_id: user.id,
         token_hash,
@@ -138,25 +148,30 @@ export function AccessoMcpSettings() {
       setNewPat(pat); // mostrato una sola volta
       setLabel('');
       toast.success('Token creato. Copialo ora: non sarà più mostrato.');
-      await reload();
+      await reload(true);
     } finally {
       setCreating(false);
     }
   }
-
+ 
   async function handleRevoke(id: string) {
-    const { error } = await supabase
-      .from('mcp_access_tokens')
-      .update({ revoked_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) {
-      toast.error(`Revoca fallita: ${error.message}`);
-      return;
+    setRevokingId(id);
+    try {
+      const { error } = await supabase
+        .from('mcp_access_tokens')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) {
+        toast.error(`Revoca fallita: ${error.message}`);
+        return;
+      }
+      toast.success('Token revocato.');
+      await reload(true);
+    } finally {
+      setRevokingId(null);
     }
-    toast.success('Token revocato.');
-    await reload();
   }
-
+ 
   // Cambia il livello di permesso di una connessione AI senza riconnettere: aggiorna il tier sul
   // refresh token attivo; la rotazione (mcp_oauth_exchange_refresh) lo porta avanti, così al
   // prossimo rinnovo dell'access token (≤ 1h) l'AI opera col nuovo livello. RLS: l'utente può
@@ -171,9 +186,9 @@ export function AccessoMcpSettings() {
     setConnBusy(null);
     if (error) { toast.error(`Modifica permessi fallita: ${error.message}`); return; }
     toast.success('Permessi aggiornati. L\'AI userà il nuovo livello al prossimo rinnovo (entro ~1 ora).');
-    await reload();
+    await reload(true);
   }
-
+ 
   // Revoca una connessione AI: l'AI non potrà più rinnovare il proprio accesso. L'access token già
   // emesso resta valido fino a scadenza (≤ 1h, è auto-contenuto), poi l'accesso cessa.
   async function handleRevokeConn(tokenHash: string) {
@@ -185,28 +200,28 @@ export function AccessoMcpSettings() {
     setConnBusy(null);
     if (error) { toast.error(`Revoca fallita: ${error.message}`); return; }
     toast.success('Connessione revocata. L\'accesso dell\'AI cessa entro ~1 ora (alla scadenza del token in corso).');
-    await reload();
+    await reload(true);
   }
-
+ 
   const copy = (text: string, msg: string) => {
     navigator.clipboard?.writeText(text).then(
       () => toast.success(msg),
       () => toast.error('Copia non riuscita.'),
     );
   };
-
+ 
   const configSnippet = (pat: string) => JSON.stringify(
     { mcpServers: { aml: { url: endpointUrl, headers: { Authorization: `Bearer ${pat}` } } } },
     null,
     2,
   );
-
+ 
   const statoToken = (t: TokenRow): { testo: string; classe: string } => {
     if (t.revoked_at) return { testo: 'Revocato', classe: 'bg-red-50 text-red-600' };
     if (t.expires_at && new Date(t.expires_at) < new Date()) return { testo: 'Scaduto', classe: 'bg-amber-50 text-amber-600' };
     return { testo: 'Attivo', classe: 'bg-green-50 text-green-700' };
   };
-
+ 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
       <div className="flex items-center gap-2">
@@ -217,7 +232,7 @@ export function AccessoMcpSettings() {
         Per collegare un assistente AI al tuo account usa
         l'endpoint qui sotto. L'accesso avviene solo dopo la tua autorizzazione con il <strong>tuo login</strong>. Resta limitato al tuo studio e ai tuoi permessi.
       </p>
-
+ 
       {/* Endpoint */}
       <div className="bg-gray-50 rounded-lg p-3 text-sm flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -232,7 +247,7 @@ export function AccessoMcpSettings() {
           <Copy className="w-4 h-4" />
         </button>
       </div>
-
+ 
       {/* Guida Claude Desktop via connettore (OAuth) — via consigliata, senza token. */}
       <div className="border border-gray-200 rounded-lg">
         <button
@@ -270,7 +285,7 @@ export function AccessoMcpSettings() {
           </div>
         )}
       </div>
-
+ 
       {/* Connessioni AI attive (OAuth/connettore): vedi il livello, cambialo o revoca. */}
       <div className="border border-gray-200 rounded-lg p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
@@ -278,15 +293,15 @@ export function AccessoMcpSettings() {
             <ShieldCheck className="w-4 h-4 text-blue-600" />
             <h4 className="text-sm font-semibold text-gray-800">Connessioni AI attive</h4>
           </div>
-          <button onClick={reload} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400" title="Aggiorna">
-            <RefreshCw className="w-4 h-4" />
+          <button onClick={() => reload(true)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400" title="Aggiorna">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
         <p className="text-xs text-gray-500">
           Assistenti AI collegati al tuo account tramite login (connettore). Qui puoi <strong>cambiare il
           livello di permesso</strong> o <strong>revocare</strong> l'accesso in qualsiasi momento.
         </p>
-
+ 
         {loading ? (
           <div className="text-sm text-gray-400 py-3">Caricamento…</div>
         ) : conns.length === 0 ? (
@@ -339,7 +354,7 @@ export function AccessoMcpSettings() {
           Per applicarlo <strong>subito</strong>, disconnetti e subito dopo riconnetti il connettore nell'assistente AI.
         </p>
       </div>
-
+ 
       {/* Token di accesso — feature avanzata, raramente necessaria: collassata di default. */}
       <div className="border border-gray-200 rounded-lg">
         <button
@@ -360,14 +375,14 @@ export function AccessoMcpSettings() {
             ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
             : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
         </button>
-
+ 
         {tokensOpen && (
           <div className="border-t border-gray-200 p-4 space-y-4">
             <p className="text-xs text-gray-500">
               Un token personale (PAT) autentica un client MCP tramite l'header <code>Authorization: Bearer …</code>
               Opera sempre con i <strong>tuoi permessi</strong>, resta limitato al tuo studio e puoi revocarlo in qualsiasi momento.
             </p>
-
+ 
             {tableMissing ? (
               <div className="flex items-start gap-2 bg-amber-50 text-amber-700 rounded-lg p-3 text-sm">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -400,7 +415,7 @@ export function AccessoMcpSettings() {
                     </div>
                   </div>
                 )}
-
+ 
                 {/* Form creazione */}
                 <div className="border border-gray-200 rounded-lg p-4 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -445,7 +460,7 @@ export function AccessoMcpSettings() {
                     <Plus className="w-4 h-4" /> {creating ? 'Creazione…' : 'Genera token'}
                   </button>
                 </div>
-
+ 
                 {/* Configurazione manuale a token, per client non-OAuth. */}
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-2">
                   <div className="font-medium text-gray-700">Configurare un client con un token</div>
@@ -459,13 +474,13 @@ export function AccessoMcpSettings() {
                     usa il connettore (vedi “Come collegare Claude Desktop” in alto).
                   </p>
                 </div>
-
+ 
                 {/* Lista token */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-semibold text-gray-700">Token esistenti</h4>
-                    <button onClick={reload} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400" title="Aggiorna">
-                      <RefreshCw className="w-4 h-4" />
+                    <button onClick={() => reload(true)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400" title="Aggiorna">
+                      <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
                     </button>
                   </div>
                   {loading ? (
@@ -492,9 +507,13 @@ export function AccessoMcpSettings() {
                             {revocabile && (
                               <button
                                 onClick={() => handleRevoke(t.id)}
-                                className="shrink-0 flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100"
+                                disabled={revokingId === t.id}
+                                className="shrink-0 flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <Trash2 className="w-3.5 h-3.5" /> Revoca
+                                {revokingId === t.id
+                                  ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  : <Trash2 className="w-3.5 h-3.5" />}
+                                {revokingId === t.id ? 'Revoca…' : 'Revoca'}
                               </button>
                             )}
                           </div>
