@@ -212,28 +212,30 @@ export function PianoApprovazione({
   const azioniCorrenti: Azione[] = (editing && draft ? draft : piano?.azioni) ?? [];
 
   function avviaModifica() {
-    if (!piano) return;
-    const azioniPrecompilate = (piano.azioni ?? []).map((a) => {
-      if (a.tool === 'modifica_cliente' && a.args.cliente_id) {
-        const tipo = nomi.clienteTipi?.[a.args.cliente_id] || 'impresa';
-        const nomeField =
-          tipo === 'persona_fisica' ? 'nome_cognome_pf' :
-          tipo === 'professionista' ? 'nome_cognome_prof' :
-          'ragione_sociale';
-        return {
-          ...a,
-          args: {
-            codice_cliente: nomi.clienteCodici[a.args.cliente_id] || '',
-            [nomeField]: nomi.clienteNomi[a.args.cliente_id] || '',
-            ...a.args, // i campi già passati dall'AI hanno precedenza
-          },
-        };
-      }
-      return a;
-    });
-    setDraft(JSON.parse(JSON.stringify(azioniPrecompilate)));
-    setEditing(true);
-  }
+  if (!piano) return;
+  const azioniPrecompilate = (piano.azioni ?? []).map((a) => {
+    if (a.tool === 'modifica_cliente' && a.args.cliente_id) {
+      const id = a.args.cliente_id;
+      // Determina il campo nome dal tipo, con fallback sicuro a ragione_sociale.
+      const tipo = nomi.clienteTipi?.[id] ?? 'impresa';
+      const nomeField =
+        tipo === 'persona_fisica' ? 'nome_cognome_pf' :
+        tipo === 'professionista' ? 'nome_cognome_prof' :
+        'ragione_sociale';
+      return {
+        ...a,
+        args: {
+          codice_cliente: nomi.clienteCodici?.[id] || '',
+          [nomeField]: nomi.clienteNomi?.[id] || '',
+          ...a.args, // i campi già passati dall'AI hanno precedenza
+        },
+      };
+    }
+    return a;
+  });
+  setDraft(JSON.parse(JSON.stringify(azioniPrecompilate)));
+  setEditing(true);
+}
 
   function annullaModifica() {
     setEditing(false);
