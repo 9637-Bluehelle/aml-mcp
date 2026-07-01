@@ -122,13 +122,27 @@ export function setArgPath(args: Record<string, any>, path: string, value: any):
 }
 // Campi da mostrare sempre nell'editor anche se assenti negli args (l'utente potrebbe volerli compilare).
 const CAMPI_SEMPRE_VISIBILI: Partial<Record<string, Set<string>>> = {
-  modifica_cliente: new Set(['codice_cliente']),
+  modifica_cliente: new Set(['codice_cliente', 'ragione_sociale', 'nome_cognome_pf', 'nome_cognome_prof']),
 };
+
+// Campi nome mutuamente esclusivi per modifica_cliente: ne appare solo uno.
+const NOME_FIELDS_MODIFICA = ['ragione_sociale', 'nome_cognome_pf', 'nome_cognome_prof'];
 
 export function campiEditabiliPresenti(tool: string, args: Record<string, any>): CampoEditabile[] {
   const sempreVisibili = CAMPI_SEMPRE_VISIBILI[tool] ?? new Set();
+
+  // Per modifica_cliente: tra i tre campi nome, mostra solo quello con valore;
+  // se nessuno ce l'ha (pre-popolazione non arrivata), mostra ragione_sociale come default.
+  const campoNomeAttivo = tool === 'modifica_cliente'
+    ? (NOME_FIELDS_MODIFICA.find((k) => args[k] && String(args[k]).trim() !== '') ?? 'ragione_sociale')
+    : null;
+
   return (CAMPI[tool] ?? []).filter((c) => {
-    if (sempreVisibili.has(c.key)) return true; // sempre mostrato
+    // Mutua esclusione campi nome
+    if (campoNomeAttivo && NOME_FIELDS_MODIFICA.includes(c.key)) {
+      return c.key === campoNomeAttivo;
+    }
+    if (sempreVisibili.has(c.key)) return true;
     const v = getPath(args, c.key);
     if (v === undefined || v === null) return false;
     if (typeof v === 'string' && v.trim() === '') return false;
