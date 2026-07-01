@@ -215,7 +215,7 @@ export function PianoApprovazione({
     if (!piano) return;
     const azioniPrecompilate = (piano.azioni ?? []).map((a) => {
       if (a.tool === 'modifica_cliente' && a.args.cliente_id) {
-        const tipo = nomi.clienteTipi[a.args.cliente_id] || 'impresa';
+        const tipo = nomi.clienteTipi?.[a.args.cliente_id] || 'impresa';
         const nomeField =
           tipo === 'persona_fisica' ? 'nome_cognome_pf' :
           tipo === 'professionista' ? 'nome_cognome_prof' :
