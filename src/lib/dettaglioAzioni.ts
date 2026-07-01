@@ -74,6 +74,7 @@ export function riassuntoArgs(args: Record<string, any>, ctx?: ContestoNomi): st
 /** Info per risolvere i nomi citati dalle azioni (cliente per incarico; incarico+cliente+PEP per RT2). */
 export interface ContestoNomi {
   clienteNomi: Record<string, string>;
+  clienteCodici: Record<string, string>;  // <-- nuovo
   incarichiInfo: Record<string, { codice?: string; clienteNome?: string; tipologiaId?: string; isPep: boolean }>;
 }
 
