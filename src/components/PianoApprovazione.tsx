@@ -339,7 +339,6 @@ export function PianoApprovazione({
                   <div className="text-xs text-gray-500 mt-0.5 break-words">{riassuntoArgs(a.args, nomi)}</div>
                   {editing ? (
                     (() => {
-                      console.log('DEBUG', a.tool, a.args); // temporaneo
                       const d = buildDettaglioAzione(a.tool, a.args, nomi);
                       const campiEditabili = new Set(campiEditabiliPresenti(a.tool, a.args).map((c) => c.label));
                       // Righe di SOLA contestualizzazione: quelle che AzioneEditor non gestisce (riferimento al
@@ -347,7 +346,7 @@ export function PianoApprovazione({
                       const righeSoloLettura = d.righe.filter((r) => !campiEditabili.has(r.label));
                       return (
                         <div className="mt-2 space-y-2">
-                          {righeSoloLettura.length > 0 && <DettaglioAzione righe={righeSoloLettura} />}
+                          {righeSoloLettura.length > 0 && <ContenutoDettaglio righe={righeSoloLettura} />}
                           <AzioneEditor tool={a.tool} args={a.args} onChange={(path, v) => setCampo(i, path, v)} />
                           {d.anteprima && <ContenutoDettaglio righe={[]} anteprima={d.anteprima} />}
                         </div>
