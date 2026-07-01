@@ -116,10 +116,15 @@ export function setArgPath(args: Record<string, any>, path: string, value: any):
   if (rest.length === 0) return { ...args, [head]: value };
   return { ...args, [head]: setArgPath((args?.[head] as Record<string, any>) ?? {}, rest.join('.'), value) };
 }
+// Campi da mostrare sempre nell'editor anche se assenti negli args (l'utente potrebbe volerli compilare).
+const CAMPI_SEMPRE_VISIBILI: Partial<Record<string, Set<string>>> = {
+  modifica_cliente: new Set(['codice_cliente']),
+};
 
-/** Campi sicuri effettivamente valorizzati dall'AI per questa azione (gli altri non si mostrano). */
 export function campiEditabiliPresenti(tool: string, args: Record<string, any>): CampoEditabile[] {
+  const sempreVisibili = CAMPI_SEMPRE_VISIBILI[tool] ?? new Set();
   return (CAMPI[tool] ?? []).filter((c) => {
+    if (sempreVisibili.has(c.key)) return true; // sempre mostrato
     const v = getPath(args, c.key);
     if (v === undefined || v === null) return false;
     if (typeof v === 'string' && v.trim() === '') return false;
