@@ -49,14 +49,17 @@ export async function risolviNomiAzioni(azioni: Azione[]): Promise<ContestoNomi>
   const clienteNomi: Record<string, string> = {};
   const pepById: Record<string, boolean> = {};
   const clienteCodici: Record<string, string> = {}; 
+  const clienteTipi: Record<string, string> = {};
+
   if (allCli.length) {
     const { data: clis } = await supabase
       .from('clienti')
-      .select('id, ragione_sociale, codice_cliente, pep') 
+      .select('id, ragione_sociale, codice_cliente, tipo_cliente, pep') 
       .in('id', allCli);
     (clis ?? []).forEach((c: any) => {
       clienteNomi[c.id] = c.ragione_sociale;
       clienteCodici[c.id] = c.codice_cliente || '';  
+      clienteTipi[c.id] = c.tipo_cliente || 'impresa';
       pepById[c.id] = c.pep === true;
     });
   }
@@ -67,5 +70,5 @@ export async function risolviNomiAzioni(azioni: Azione[]): Promise<ContestoNomi>
     incarichiInfo[id].isPep = cid ? !!pepById[cid] : false;
   });
 
-  return { clienteNomi, clienteCodici, incarichiInfo };
+  return { clienteNomi, clienteCodici, clienteTipi, incarichiInfo };
 }
