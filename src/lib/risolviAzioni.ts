@@ -48,9 +48,17 @@ export async function risolviNomiAzioni(azioni: Azione[]): Promise<ContestoNomi>
   const allCli = [...new Set([...cliIds, ...cliIdsDaModificaIncarico, ...extraCliIds])];
   const clienteNomi: Record<string, string> = {};
   const pepById: Record<string, boolean> = {};
+  const clienteCodici: Record<string, string> = {}; 
   if (allCli.length) {
-    const { data: clis } = await supabase.from('clienti').select('id, ragione_sociale, pep').in('id', allCli);
-    (clis ?? []).forEach((c: any) => { clienteNomi[c.id] = c.ragione_sociale; pepById[c.id] = c.pep === true; });
+    const { data: clis } = await supabase
+      .from('clienti')
+      .select('id, ragione_sociale, codice_cliente, pep') 
+      .in('id', allCli);
+    (clis ?? []).forEach((c: any) => {
+      clienteNomi[c.id] = c.ragione_sociale;
+      clienteCodici[c.id] = c.codice_cliente || '';  
+      pepById[c.id] = c.pep === true;
+    });
   }
 
   Object.keys(incarichiInfo).forEach((id) => {
@@ -59,5 +67,5 @@ export async function risolviNomiAzioni(azioni: Azione[]): Promise<ContestoNomi>
     incarichiInfo[id].isPep = cid ? !!pepById[cid] : false;
   });
 
-  return { clienteNomi, incarichiInfo };
+  return { clienteNomi, clienteCodici, incarichiInfo };
 }
