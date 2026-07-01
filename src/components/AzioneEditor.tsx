@@ -179,6 +179,62 @@ function CampoInput({ campo, value, onChange }: { campo: CampoEditabile; value: 
   }
 }
 
+function TitolariEditor({
+  titolari,
+  onChange,
+}: {
+  titolari: Record<string, any>[];
+  onChange: (nuovi: Record<string, any>[]) => void;
+}) {
+  const base = 'border border-gray-300 rounded-md px-2 py-1 text-xs w-full focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+  const set = (idx: number, key: string, value: any) => {
+    const nuovi = titolari.map((t, i) => i === idx ? { ...t, [key]: value } : t);
+    onChange(nuovi);
+  };
+
+  return (
+    <div className="space-y-3">
+      {titolari.map((t, idx) => (
+        <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+            Titolare {idx + 1}
+          </div>
+          {[
+            { key: 'nome_cognome', label: 'Nome e cognome', tipo: 'text' },
+            { key: 'codice_fiscale', label: 'Codice fiscale', tipo: 'text' },
+            { key: 'ruolo', label: 'Ruolo', tipo: 'text' },
+            { key: 'note_quota', label: 'Quota / note', tipo: 'text' },
+            { key: 'data_nascita', label: 'Data di nascita', tipo: 'date' },
+            { key: 'luogo_nascita', label: 'Luogo di nascita', tipo: 'text' },
+            { key: 'nazionalita', label: 'Nazionalità', tipo: 'text' },
+            { key: 'residenza', label: 'Residenza', tipo: 'text' },
+            { key: 'pep_carica', label: 'Carica PEP', tipo: 'text' },
+          ].filter(({ key }) => t[key] !== undefined && t[key] !== null && t[key] !== '').map(({ key, label, tipo }) => (
+            <div key={key} className="grid grid-cols-[9rem_1fr] gap-x-3 items-center">
+              <label className="text-xs text-gray-500">{label}</label>
+              {tipo === 'date' ? (
+                <input type="date"
+                  value={/^\d{4}-\d{2}-\d{2}$/.test(String(t[key])) ? String(t[key]) : formatDateToISO(String(t[key] ?? ''))}
+                  onChange={(e) => set(idx, key, e.target.value ? normalizeDate(e.target.value) : '')}
+                  className={base} />
+              ) : (
+                <input type="text" value={t[key] ?? ''} onChange={(e) => set(idx, key, e.target.value)} className={base} />
+              )}
+            </div>
+          ))}
+          <div className="grid grid-cols-[9rem_1fr] gap-x-3 items-center">
+            <label className="text-xs text-gray-500">PEP</label>
+            <input type="checkbox" checked={t.is_pep === true}
+              onChange={(e) => set(idx, 'is_pep', e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AzioneEditor({
   tool,
   args,
@@ -189,25 +245,42 @@ export function AzioneEditor({
   onChange: (path: string, value: any) => void;
 }) {
   const campi = campiEditabiliPresenti(tool, args);
-  if (campi.length === 0) {
+  const hasTitolari = (tool === 'crea_bozza_cliente' || tool === 'modifica_cliente')
+    && Array.isArray(args.titolari_effettivi)
+    && args.titolari_effettivi.length > 0;
+
+  if (campi.length === 0 && !hasTitolari) {
     return <p className="text-xs text-gray-400 italic">Questa azione non ha campi modificabili a mano.</p>;
   }
   return (
-    <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-2">
-      {campi.map((c, i) => {
-        const nuovoGruppo = c.gruppo && c.gruppo !== campi[i - 1]?.gruppo;
-        return (
-          <Fragment key={c.key}>
-            {nuovoGruppo && (
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mt-2 first:mt-0">{c.gruppo}</div>
-            )}
-            <div className="grid grid-cols-[9rem_1fr] gap-x-3 items-center">
-              <label className="text-xs text-gray-500 break-words">{c.label}</label>
-              <CampoInput campo={c} value={getPath(args, c.key)} onChange={(v) => onChange(c.key, v)} />
-            </div>
-          </Fragment>
-        );
-      })}
+    <div className="space-y-3">
+      {campi.length > 0 && (
+        <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-2">
+          {campi.map((c, i) => {
+            const nuovoGruppo = c.gruppo && c.gruppo !== campi[i - 1]?.gruppo;
+            return (
+              <Fragment key={c.key}>
+                {nuovoGruppo && (
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mt-2 first:mt-0">{c.gruppo}</div>
+                )}
+                <div className="grid grid-cols-[9rem_1fr] gap-x-3 items-center">
+                  <label className="text-xs text-gray-500 break-words">{c.label}</label>
+                  <CampoInput campo={c} value={getPath(args, c.key)} onChange={(v) => onChange(c.key, v)} />
+                </div>
+              </Fragment>
+            );
+          })}
+        </div>
+      )}
+      {hasTitolari && (
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Titolari effettivi</div>
+          <TitolariEditor
+            titolari={args.titolari_effettivi}
+            onChange={(nuovi) => onChange('titolari_effettivi', nuovi)}
+          />
+        </div>
+      )}
     </div>
   );
 }
