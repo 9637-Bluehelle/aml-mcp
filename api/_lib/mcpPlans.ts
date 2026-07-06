@@ -336,3 +336,46 @@ export async function statoPiano(
     esito: data.esito ?? null,
   };
 }
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Attende (poll server-side, non-bloccante per il DB) finché lo stato del piano esce da
+ * pending/approved/executing, o scade `timeoutSeconds`. Pensato per l'AI: invece di chiedere
+ * all'utente "fammi sapere quando approvi", chiama questo subito dopo aver proposto il piano — la
+ * chiamata resta "appesa" e torna da sola non appena l'utente approva/rifiuta/il piano viene
+ * eseguito (o al timeout, con `status` ancora pendente e `scaduto_attesa: true`, così l'AI sa se
+ * ha senso riprovare). Timeout tenuto sotto il maxDuration della function serverless (vercel.json:
+ * maxDuration=30 per api/mcp; qui default 20s, max 25s) così scade sempre con un esito pulito
+ * invece di essere ucciso a metà da un 504 anonimo — una singola host/function invocation.
+ */
+export async function attendiPiano(
+  client: SupabaseClient,
+  planId: string,
+  timeoutSeconds = 20,
+): Promise<{ plan_id: string; status: string; n_azioni: number; esito: any[] | null; scaduto_attesa: boolean }> {
+  const cappedTimeout = Math.min(Math.max(timeoutSeconds, 1), 25);
+  const deadline = Date.now() + cappedTimeout * 1000;
+  const pollIntervalMs = 1500;
+
+  // Stati "non definitivi": il piano può ancora cambiare. Su 'executing' continuiamo ad aspettare
+  // perché eseguiPiano scrive lo stato finale (executed/failed) in pochi istanti.
+  const NON_DEFINITIVI = new Set(['pending', 'approved', 'executing']);
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const esito = await statoPiano(client, planId);
+    if (!NON_DEFINITIVI.has(esito.status) || Date.now() >= deadline) {
+      return {
+        plan_id: esito.plan_id,
+        status: esito.status,
+        n_azioni: esito.n_azioni,
+        esito: esito.esito,
+        scaduto_attesa: NON_DEFINITIVI.has(esito.status),
+      };
+    }
+    await sleep(pollIntervalMs);
+  }
+}
