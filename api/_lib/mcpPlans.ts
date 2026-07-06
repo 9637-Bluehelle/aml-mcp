@@ -157,14 +157,15 @@ function buildRiepilogo(azioni: AzionePiano[]): string[] {
 }
 
 /**
- * Valida le azioni e salva un piano in stato `pending`. Ritorna id, riepilogo leggibile e link
- * breve a scadenza alla pagina di approvazione (§7.3). Nessuna scrittura sui dati business qui.
+ * Valida le azioni e salva un piano in stato `pending`. Ritorna id, riepilogo leggibile e link alla
+ * pagina di approvazione (§7.3). I piani NON scadono più: restano in attesa finché l'utente non li
+ * approva/rifiuta esplicitamente. Nessuna scrittura sui dati business qui.
  */
 export async function proponiPiano(
   client: SupabaseClient,
   studioId: string | null,
   input: { titolo?: string; azioni: AzionePiano[] },
-): Promise<{ plan_id: string; n_azioni: number; scadenza: string; link: string; riepilogo: string[] }> {
+): Promise<{ plan_id: string; n_azioni: number; link: string; riepilogo: string[] }> {
   const azioniValidate = validaAzioni(input.azioni);
 
   const { data, error } = await client
@@ -175,7 +176,7 @@ export async function proponiPiano(
       azioni: azioniValidate,
       status: 'pending',
     })
-    .select('id, expires_at')
+    .select('id')
     .single();
   if (error) throw new Error(error.message);
 
@@ -184,7 +185,6 @@ export async function proponiPiano(
   return {
     plan_id: data.id,
     n_azioni: azioniValidate.length,
-    scadenza: data.expires_at,
     link: buildApprovalLink(data.id),
     riepilogo,
   };
@@ -192,7 +192,7 @@ export async function proponiPiano(
 
 /**
  * Aggiorna un piano già proposto e ANCORA `pending`, sostituendo le sue azioni (e opzionalmente il
- * titolo) — invece di crearne uno nuovo. Consentito solo finché il piano è in attesa e non scaduto:
+ * titolo) — invece di crearne uno nuovo. Consentito solo finché il piano è ancora in attesa:
  * dopo l'approvazione/esecuzione/rifiuto non è più modificabile. RLS: l'utente aggiorna solo i propri
  * piani. Il guard `.eq('status','pending')` evita la corsa con un'approvazione concorrente.
  */
@@ -200,21 +200,18 @@ export async function aggiornaPiano(
   client: SupabaseClient,
   planId: string,
   input: { titolo?: string; azioni: AzionePiano[] },
-): Promise<{ plan_id: string; n_azioni: number; scadenza: string; link: string; riepilogo: string[] }> {
+): Promise<{ plan_id: string; n_azioni: number; link: string; riepilogo: string[] }> {
   const azioniValidate = validaAzioni(input.azioni);
 
   const { data: plan, error: selErr } = await client
     .from('mcp_pending_plans')
-    .select('id, status, expires_at')
+    .select('id, status')
     .eq('id', planId)
     .maybeSingle();
   if (selErr) throw new Error(selErr.message);
   if (!plan) throw new Error('Piano non trovato (o non appartiene al tuo studio).');
   if (plan.status !== 'pending') {
     throw new Error(`Il piano non è più modificabile (stato: ${plan.status}). Si aggiornano solo i piani ancora in attesa di approvazione; per cambiare qualcosa proponi un nuovo piano.`);
-  }
-  if (new Date(plan.expires_at) < new Date()) {
-    throw new Error('Piano scaduto: non più modificabile. Proponi un nuovo piano.');
   }
 
   const patch: Record<string, any> = { azioni: azioniValidate };
@@ -225,7 +222,7 @@ export async function aggiornaPiano(
     .update(patch)
     .eq('id', planId)
     .eq('status', 'pending')
-    .select('id, expires_at')
+    .select('id')
     .maybeSingle();
   if (upErr) throw new Error(upErr.message);
   if (!updated) throw new Error('Piano non aggiornato: potrebbe essere stato approvato o rifiutato nel frattempo.');
@@ -233,14 +230,13 @@ export async function aggiornaPiano(
   return {
     plan_id: updated.id,
     n_azioni: azioniValidate.length,
-    scadenza: updated.expires_at,
     link: buildApprovalLink(updated.id),
     riepilogo: buildRiepilogo(azioniValidate),
   };
 }
 
 /**
- * Esegue un piano SOLO se `approved` e non scaduto. Claim atomico (approved → executing) per
+ * Esegue un piano SOLO se `approved`. Claim atomico (approved → executing) per
  * evitare doppia esecuzione, poi esegue le azioni e salva l'esito per-azione (status=executed).
  */
 export async function eseguiPiano(
@@ -250,20 +246,13 @@ export async function eseguiPiano(
 ): Promise<{ plan_id: string; status: string; eseguite: number; totali: number; esito: any[] }> {
   const { data: plan, error } = await client
     .from('mcp_pending_plans')
-    .select('id, status, azioni, expires_at')
+    .select('id, status, azioni')
     .eq('id', planId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!plan) throw new Error('Piano non trovato (o non appartiene al tuo studio).');
 
   if (plan.status === 'executed') throw new Error('Piano già eseguito.');
-
-  if (new Date(plan.expires_at) < new Date()) {
-    if (plan.status === 'pending' || plan.status === 'approved') {
-      await client.from('mcp_pending_plans').update({ status: 'expired' }).eq('id', planId).eq('status', plan.status);
-    }
-    throw new Error('Piano scaduto: non più eseguibile.');
-  }
 
   if (plan.status !== 'approved') {
     throw new Error(`Piano non approvato (stato: ${plan.status}). Va approvato da un umano alla pagina di approvazione prima di poter essere eseguito.`);
@@ -342,6 +331,39 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Nota in chiaro che accompagna l'esito: l'AI non deve dedurre nulla dal solo `status`.
+ * Punto critico (§7.3): un timeout (`scaduto_attesa: true`) NON è un fallimento e NON deve portare a
+ * riproporre il piano — lo diciamo esplicitamente nel payload, non solo nella description del tool,
+ * così il segnale è ridondante e non fraintendibile.
+ */
+function notaEsitoPiano(status: string, scaduto: boolean): string {
+  if (scaduto) {
+    const dettaglio =
+      status === 'pending' ? 'è ancora in attesa di approvazione umana in piattaforma'
+      : status === 'approved' ? 'è già stato approvato e la piattaforma lo sta eseguendo'
+      : 'è approvato ed è in esecuzione';
+    return `ATTESA SCADUTA: NON è un errore e il piano NON è fallito — ${dettaglio}. ` +
+      'NON creare un nuovo piano e NON chiamare esegui_piano. Puoi richiamare attendi_esito_piano una ' +
+      "sola volta ancora, oppure ricordare all'utente di approvarlo/rifiutarlo in piattaforma e di " +
+      "avvisarti quando l'ha fatto.";
+  }
+  switch (status) {
+    case 'executed':
+      return 'Piano approvato ed eseguito: le modifiche sono state scritte.';
+    case 'failed':
+      return 'Piano approvato ma una o più azioni non sono state scritte: leggi "esito" per capire quali ' +
+        'e, se serve, proponi un nuovo piano solo per correggere quelle.';
+    case 'rejected':
+      return "L'utente ha rifiutato il piano: NON riproporlo identico; se serve, chiedi cosa correggere e " +
+        'proponi un piano diverso.';
+    case 'expired':
+      return 'Il piano è scaduto senza essere approvato: se serve ancora, proponine uno nuovo.';
+    default:
+      return `Esito definitivo: ${status}.`;
+  }
+}
+
+/**
  * Attende (poll server-side, non-bloccante per il DB) finché lo stato del piano esce da
  * pending/approved/executing, o scade `timeoutSeconds`. Pensato per l'AI: invece di chiedere
  * all'utente "fammi sapere quando approvi", chiama questo subito dopo aver proposto il piano — la
@@ -355,7 +377,7 @@ export async function attendiPiano(
   client: SupabaseClient,
   planId: string,
   timeoutSeconds = 20,
-): Promise<{ plan_id: string; status: string; n_azioni: number; esito: any[] | null; scaduto_attesa: boolean }> {
+): Promise<{ plan_id: string; status: string; n_azioni: number; esito: any[] | null; scaduto_attesa: boolean; nota: string }> {
   const cappedTimeout = Math.min(Math.max(timeoutSeconds, 1), 25);
   const deadline = Date.now() + cappedTimeout * 1000;
   const pollIntervalMs = 1500;
@@ -368,12 +390,14 @@ export async function attendiPiano(
   while (true) {
     const esito = await statoPiano(client, planId);
     if (!NON_DEFINITIVI.has(esito.status) || Date.now() >= deadline) {
+      const scaduto = NON_DEFINITIVI.has(esito.status);
       return {
         plan_id: esito.plan_id,
         status: esito.status,
         n_azioni: esito.n_azioni,
         esito: esito.esito,
-        scaduto_attesa: NON_DEFINITIVI.has(esito.status),
+        scaduto_attesa: scaduto,
+        nota: notaEsitoPiano(esito.status, scaduto),
       };
     }
     await sleep(pollIntervalMs);
