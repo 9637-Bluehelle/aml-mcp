@@ -116,6 +116,7 @@ interface StoricoModifica {
   valore_precedente: string | null;
   valore_nuovo: string | null;
   user_id: string;
+  source?: string | null;
 }
 
 // Etichette leggibili per i campi dello storico
