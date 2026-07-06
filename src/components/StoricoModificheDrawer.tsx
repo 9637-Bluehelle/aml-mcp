@@ -1,4 +1,4 @@
-import { Archive, RotateCcw, Trash2, X, ListOrdered, Loader2, UserCheck } from 'lucide-react';
+import { Archive, RotateCcw, Trash2, X, ListOrdered, Loader2, UserCheck, Bot } from 'lucide-react';
 import { formatStoricoValue } from '../lib/storicoFormat';
 
 // ---------------------------------------------------------------------------
@@ -15,6 +15,8 @@ export interface StoricoItem {
   valore_precedente: string | null;
   valore_nuovo: string | null;
   user_id?: string | null;
+  /** Origine della scrittura: 'ai' = fatta tramite l'assistente AI (con l'identità dell'utente). */
+  source?: string | null;
 }
 
 interface Props {
@@ -97,7 +99,21 @@ export function StoricoModificheDrawer({
                 const negativo = isCestinato || isArchiviato;
 
                 const utente = mod.user_id ? userNameMap[mod.user_id] : null;
+                const isAi = mod.source === 'ai';
                 const data = fmtDataOra(mod.created_at);
+                // Attribuzione condivisa (evento + modifica campo): mostra CHI ha fatto la modifica
+                // e, se via assistente AI, un badge "via AI" — così si distingue una modifica umana
+                // da una fatta tramite AI a nome dello stesso utente.
+                const attribuzione = (utente || isAi) ? (
+                  <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                    {utente && <span>da <span className="font-medium text-gray-600">{utente}</span></span>}
+                    {isAi && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 font-medium">
+                        <Bot className="w-3 h-3" /> via AI
+                      </span>
+                    )}
+                  </p>
+                ) : null;
 
                 if (isEvento) {
                   const eventoLabel = isCestinato ? 'Spostato nel cestino'
@@ -112,7 +128,7 @@ export function StoricoModificheDrawer({
                         </span>
                         <span className="text-[11px] text-gray-400 shrink-0">{data}</span>
                       </div>
-                      {utente && <p className="text-[11px] text-gray-500 mt-0.5">da <span className="font-medium text-gray-700">{utente}</span></p>}
+                      {attribuzione}
                     </div>
                   );
                 }
@@ -132,7 +148,7 @@ export function StoricoModificheDrawer({
                         {formatStoricoValue(mod.valore_nuovo, mod.campo, valueMap)}
                       </span>
                     </div>
-                    {utente && <p className="text-[11px] text-gray-400 mt-1.5">da <span className="font-medium text-gray-600">{utente}</span></p>}
+                    {attribuzione}
                   </div>
                 );
               })}
