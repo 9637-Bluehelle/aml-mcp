@@ -18,7 +18,7 @@ import { enrichClienteWithRappresentante, loadTitolariWithPersona } from '../lib
 import { addUserLog } from './LogUtente';
 import { RiskBadge } from './RiskBadge';
 import { DocumentiAllegati, TIPOLOGIE_DOCUMENTO } from './DocumentiAllegati';
-import { generateAndDownloadDOCX_AV1, generateBlobDOCX_AV1, generateBlobDOCX_AV3, generateBlobDOCX_AV4, generateBlobDOCX_AV5, generateBlobDOCX_AV6, type DocumentoAllegato } from '../lib/docx-converter';
+import { generateAndDownloadDOCX_AV1, generateBlobDOCX_AV3, generateBlobDOCX_AV4, generateBlobDOCX_AV5, generateBlobDOCX_AV6, type DocumentoAllegato } from '../lib/docx-converter';
 import { getMyStudio, getMyProfile } from '../lib/studioHelper';
 import { useToast, useConfirm } from './Toast';
 import { findPersoneIdByCliente } from '../lib/personeHelper';
@@ -522,6 +522,7 @@ interface StoricoModificaItem {
   valore_precedente: string | null;
   valore_nuovo: string | null;
   user_id?: string;
+  source?: string | null;
 }
 
 const LABEL_CAMPI_SHARED: Record<string, string> = {
