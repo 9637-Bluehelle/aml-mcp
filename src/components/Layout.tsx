@@ -167,8 +167,7 @@ export function Layout({ children, activeTab, onTabChange, ruolo }: LayoutProps)
         supabase
           .from('mcp_pending_plans')
           .select('id', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString()),
+          .eq('status', 'pending'),
         supabase
           .from('documenti')
           .select('id', { count: 'exact', head: true })
