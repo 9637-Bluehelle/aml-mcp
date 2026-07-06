@@ -30,6 +30,29 @@ function errorResult(msg: string) {
   return { isError: true, content: [{ type: 'text' as const, text: msg }] };
 }
 
+// Traduce un errore Supabase/Postgres — spesso tecnico e in inglese — in un messaggio
+// leggibile e actionable per l'AI (e quindi per l'utente), anteponendo il contesto
+// dell'operazione. Il testo Postgres grezzo NON viene esposto: al modello non serve la
+// stringa tecnica, gli serve sapere cosa fare. `contesto` descrive l'operazione fallita
+// (es. "Lettura clienti non riuscita"). Da usare sui rami `if (error)` delle query.
+function dbErrorResult(contesto: string, error: unknown) {
+  const code = (error as { code?: string } | null)?.code;
+  const raw = (error as { message?: string } | null)?.message ?? '';
+  let causa: string;
+  if (code === '42501' || /row-level security|permission denied/i.test(raw)) {
+    causa = 'permesso negato: il record non appartiene al tuo studio o non hai i diritti per accedervi.';
+  } else if (code === '22P02' || /invalid input syntax for type uuid/i.test(raw)) {
+    causa = 'un identificativo passato non è un UUID valido: rileggilo da un tool di lista prima di riprovare.';
+  } else if (code === 'PGRST116' || /contains? \d+ rows|multiple.*rows/i.test(raw)) {
+    causa = 'la ricerca è ambigua (più risultati del previsto): restringi i criteri.';
+  } else if (/JWT|token.*expired|invalid.*claim/i.test(raw)) {
+    causa = 'sessione della connessione AI scaduta: va riautenticata dalla piattaforma (Impostazioni → Accesso AI).';
+  } else {
+    causa = 'errore tecnico temporaneo lato piattaforma. Riprova; se persiste, segnalalo all\'utente.';
+  }
+  return errorResult(`${contesto}: ${causa}`);
+}
+
 // Il campo `link` di proponiPiano/aggiornaPiano (pagina di approvazione) resta utile per usi
 // server-side/futuri, ma NON deve mai arrivare all'AI: l'utente è già nella piattaforma, quindi
 // non va prodotto né mostrato nessun link in chat — solo l'invito a tornare in app e approvare lì
@@ -215,7 +238,7 @@ export function buildMcpServer(
           fields,
         );
         const { data, error } = await q.order('updated_at', { ascending: false }).range(offset, offset + limit - 1);
-        if (error) return errorResult(error.message);
+        if (error) return dbErrorResult('Lettura elenco clienti non riuscita', error);
 
         const mostrati = data?.length ?? 0;
         return jsonResult({
@@ -245,7 +268,7 @@ export function buildMcpServer(
           .eq('id', args.cliente_id)
           .eq('studio_id', sid)
           .maybeSingle();
-        if (error) return errorResult(error.message);
+        if (error) return dbErrorResult('Lettura cliente non riuscita', error);
         if (!data) return errorResult('Cliente non trovato nello studio.');
         return jsonResult(data);
       } catch (e: any) {
@@ -297,7 +320,7 @@ export function buildMcpServer(
         )
           .order('nome_cognome', { ascending: true })
           .range(offset, offset + limit - 1);
-        if (error) return errorResult(error.message);
+        if (error) return dbErrorResult('Ricerca soggetti non riuscita', error);
 
         const mostrati = data?.length ?? 0;
         return jsonResult({
@@ -341,7 +364,7 @@ export function buildMcpServer(
           .eq('studio_id', sid);
         if (args.cliente_id) q = q.eq('cliente_id', args.cliente_id);
         const { data, error } = await q.order('data_inizio', { ascending: false }).range(offset, offset + limit - 1);
-        if (error) return errorResult(error.message);
+        if (error) return dbErrorResult('Lettura incarichi non riuscita', error);
 
         const mostrati = data?.length ?? 0;
         return jsonResult({
@@ -374,7 +397,7 @@ export function buildMcpServer(
           .order('created_at', { ascending: false });
         if (args.solo_aperti !== false) q = q.eq('status', 'open');
         const { data, error } = await q;
-        if (error) return errorResult(error.message);
+        if (error) return dbErrorResult('Lettura alert non riuscita', error);
         return jsonResult({ count: data?.length ?? 0, alert: data ?? [] });
       } catch (e: any) {
         return errorResult(e?.message || String(e));
@@ -398,7 +421,7 @@ export function buildMcpServer(
           .eq('id', args.alert_id)
           .eq('studio_id', sid)
           .maybeSingle();
-        if (error) return errorResult(error.message);
+        if (error) return dbErrorResult('Lettura alert non riuscita', error);
         if (!data) return errorResult('Alert non trovato nello studio.');
         return jsonResult({
           ...data,
