@@ -463,7 +463,9 @@ export function buildMcpServer(
         "Aspetta che l'utente approvi/rifiuti un piano (o che l'esecuzione finisca), invece di chiedere " +
         "all'utente di dirtelo. Chiamalo SUBITO dopo aver proposto/aggiornato un piano: la chiamata resta in " +
         "attesa fino a un cambio di stato o al timeout (default 20s, max 25s: è una singola invocazione, non " +
-        "un loop di più chiamate). Se torna con 'scaduto_attesa: true' lo stato è ancora pending/approved/" +
+        "un loop di più chiamate). Ogni risposta porta una 'nota' in chiaro: leggila e seguila. Una " +
+        "risposta con 'scaduto_attesa: true' NON è un fallimento (né del tool né del piano), quindi NON " +
+        "riproporre il piano. Se torna con 'scaduto_attesa: true' lo stato è ancora pending/approved/" +
         "executing: puoi richiamarlo AL PIÙ una volta ancora, ma se resta in attesa NON continuare a " +
         "interrogarlo in silenzio — di' all'utente che l'approvazione sta richiedendo tempo e che, appena " +
         "avrà approvato o rifiutato in piattaforma, dovrà avvisarti lui in chat. Se lo stato è " +
