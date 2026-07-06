@@ -5,7 +5,7 @@
  * che nella vista "Dettaglio Cliente" di RT2 Adeguata Verifica.
  * Segue lo stesso pattern di DettaglioIncaricoPage per gli incarichi.
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card } from './Card';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { FileClock, Edit3, ArrowLeft, FileText, PlusCircleIcon, Trash2 } from 'lucide-react';
