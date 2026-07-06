@@ -18,7 +18,7 @@ import { salvaCliente } from './clienteService.js';
 import { creaSoggettoWithClient } from './personeService.js';
 import { tierAllows, type McpTier } from './mcpAuth.js';
 import { creaBozzaClienteSchema, creaSoggettoSchema, creaIncaricoSchema, creaValutazioneSchema, mapArgsToWizardData, mapArgsToPersona } from './mcpTools.js';
-import { proponiPiano, aggiornaPiano, eseguiPiano, statoPiano, type AzionePiano } from './mcpPlans.js';
+import { proponiPiano, aggiornaPiano, eseguiPiano, statoPiano, attendiPiano, type AzionePiano } from './mcpPlans.js';
 import { descriviTipologie, preparaUploadDocumento, confermaUploadDocumento, caricaDocumentoBase64 } from './documentoService.js';
 import { descriviTipologiePrestazione, descriviImpostazioniIncarico } from './incaricoService.js';
 import { listaStaging, leggiStaging, proponiCatalogazione } from './documentiStagingService.js';
@@ -28,6 +28,15 @@ function jsonResult(obj: unknown) {
 }
 function errorResult(msg: string) {
   return { isError: true, content: [{ type: 'text' as const, text: msg }] };
+}
+
+// Il campo `link` di proponiPiano/aggiornaPiano (pagina di approvazione) resta utile per usi
+// server-side/futuri, ma NON deve mai arrivare all'AI: l'utente è già nella piattaforma, quindi
+// non va prodotto né mostrato nessun link in chat — solo l'invito a tornare in app e approvare lì
+// (vedi anche PRIVACY_HINT più sotto per gli UUID). Questo helper lo rimuove dalla risposta al tool.
+function omitLink<T extends { link?: unknown }>(res: T): Omit<T, 'link'> {
+  const { link, ...rest } = res;
+  return rest;
 }
 
 const ALERT_AZIONE: Record<string, string> = {
@@ -424,6 +433,34 @@ export function buildMcpServer(
   );
 
   server.registerTool(
+    'attendi_esito_piano',
+    {
+      title: 'Attendi esito di un piano (senza chiederlo all\'utente)',
+      description:
+        "Aspetta che l'utente approvi/rifiuti un piano (o che l'esecuzione finisca), invece di chiedere " +
+        "all'utente di dirtelo. Chiamalo SUBITO dopo aver proposto/aggiornato un piano: la chiamata resta in " +
+        "attesa fino a un cambio di stato o al timeout (default 20s, max 25s: è una singola invocazione, non " +
+        "un loop di più chiamate). Se torna con 'scaduto_attesa: true' lo stato è ancora pending/approved/" +
+        "executing: puoi richiamarlo AL PIÙ una volta ancora, ma se resta in attesa NON continuare a " +
+        "interrogarlo in silenzio — di' all'utente che l'approvazione sta richiedendo tempo e che, appena " +
+        "avrà approvato o rifiutato in piattaforma, dovrà avvisarti lui in chat. Se lo stato è " +
+        "'executed'/'failed'/'rejected'/'expired', è l'esito definitivo: riferiscilo (per 'failed' leggi " +
+        "'esito' per capire quale azione non è stata scritta).",
+      inputSchema: {
+        plan_id: z.string().uuid().describe('UUID del piano.'),
+        timeout_secondi: z.number().int().min(1).max(25).optional().describe('Timeout dell\'attesa in secondi (default 20, max 25).'),
+      },
+    },
+    async (args) => {
+      try {
+        return jsonResult(await attendiPiano(client, args.plan_id, args.timeout_secondi));
+      } catch (e: any) {
+        return errorResult(e?.message || String(e));
+      }
+    },
+  );
+
+  server.registerTool(
     'descrivi_tipologie_documento',
     {
       title: 'Tipologie di documento',
@@ -544,8 +581,8 @@ export function buildMcpServer(
             azioni: [{ tool: 'modifica_cliente', args: args as Record<string, any> }],
           });
           return jsonResult({
-            ...res,
-            messaggio: `Proposta creata. Mostra il link all'utente: all'approvazione l'app eseguirà da sé. Verifica con stato_piano("${res.plan_id}"). Niente è ancora stato scritto.`,
+            ...omitLink(res),
+            messaggio: `Proposta creata. Di' all'utente di tornare nella piattaforma per rivedere e approvare la modifica (non generare né mostrare link): all'approvazione l'app eseguirà da sé. Avvisa l'utente che, se non approva subito, appena avrà approvato o rifiutato in piattaforma dovrà dirtelo lui in chat. Poi chiama attendi_esito_piano("${res.plan_id}"): se rileva l'esito riferiscilo, se scade (scaduto_attesa: true) ricorda all'utente di avvisarti quando ha deciso. Niente è ancora stato scritto.`,
           });
         } catch (e: any) {
           return errorResult(`Proposta modifica cliente fallita: ${e?.message || String(e)}`);
@@ -604,8 +641,8 @@ export function buildMcpServer(
             azioni: [{ tool: 'crea_incarico', args: args as Record<string, any> }],
           });
           return jsonResult({
-            ...res,
-            messaggio: `Proposta creata. Mostra il link all'utente: all'approvazione l'app eseguirà da sé (non chiamare esegui_piano). Verifica l'esito con stato_piano("${res.plan_id}"). Niente è ancora stato scritto.`,
+            ...omitLink(res),
+            messaggio: `Proposta creata. Di' all'utente di tornare nella piattaforma per rivedere e approvare l'incarico (non generare né mostrare link; non chiamare esegui_piano): all'approvazione l'app eseguirà da sé. Avvisa l'utente che, se non approva subito, appena avrà approvato o rifiutato in piattaforma dovrà dirtelo lui in chat. Poi chiama attendi_esito_piano("${res.plan_id}"): se rileva l'esito riferiscilo, se scade (scaduto_attesa: true) ricorda all'utente di avvisarti quando ha deciso. Niente è ancora stato scritto.`,
           });
         } catch (e: any) {
           return errorResult(`Proposta incarico fallita: ${e?.message || String(e)}`);
@@ -635,8 +672,8 @@ export function buildMcpServer(
             azioni: [{ tool: 'modifica_incarico', args: args as Record<string, any> }],
           });
           return jsonResult({
-            ...res,
-            messaggio: `Proposta creata. Mostra il link all'utente: all'approvazione l'app eseguirà da sé. Verifica con stato_piano("${res.plan_id}"). Niente è ancora stato scritto.`,
+            ...omitLink(res),
+            messaggio: `Proposta creata. Di' all'utente di tornare nella piattaforma per rivedere e approvare la modifica (non generare né mostrare link): all'approvazione l'app eseguirà da sé. Avvisa l'utente che, se non approva subito, appena avrà approvato o rifiutato in piattaforma dovrà dirtelo lui in chat. Poi chiama attendi_esito_piano("${res.plan_id}"): se rileva l'esito riferiscilo, se scade (scaduto_attesa: true) ricorda all'utente di avvisarti quando ha deciso. Niente è ancora stato scritto.`,
           });
         } catch (e: any) {
           return errorResult(`Proposta modifica incarico fallita: ${e?.message || String(e)}`);
@@ -664,8 +701,8 @@ export function buildMcpServer(
             azioni: [{ tool: 'crea_valutazione', args: args as Record<string, any> }],
           });
           return jsonResult({
-            ...res,
-            messaggio: `Proposta creata. Mostra il link all'utente: all'approvazione l'app eseguirà da sé (non chiamare esegui_piano). Verifica l'esito con stato_piano("${res.plan_id}"). Niente è ancora stato scritto.`,
+            ...omitLink(res),
+            messaggio: `Proposta creata. Di' all'utente di tornare nella piattaforma per rivedere e approvare la valutazione (non generare né mostrare link; non chiamare esegui_piano): all'approvazione l'app eseguirà da sé. Avvisa l'utente che, se non approva subito, appena avrà approvato o rifiutato in piattaforma dovrà dirtelo lui in chat. Poi chiama attendi_esito_piano("${res.plan_id}"): se rileva l'esito riferiscilo, se scade (scaduto_attesa: true) ricorda all'utente di avvisarti quando ha deciso. Niente è ancora stato scritto.`,
           });
         } catch (e: any) {
           return errorResult(`Proposta valutazione fallita: ${e?.message || String(e)}`);
@@ -686,9 +723,10 @@ export function buildMcpServer(
           'usa il token "@passo:N" (N = numero del passo, 1-based) al posto dell\'UUID. Es. un solo piano: ' +
           '1) crea_bozza_cliente; 2) crea_incarico con cliente_id "@passo:1"; 3) crea_valutazione con incarico_id ' +
           '"@passo:2". Così cliente+incarico+valutazione si creano con UNA sola approvazione, senza attendere gli id. ' +
-          "Restituisce un link alla pagina di approvazione: mostralo all'utente. All'approvazione l'app ESEGUE il " +
-          "piano automaticamente (un solo passo 'Approva ed esegui'): NON devi chiamare esegui_piano. Verifica " +
-          "l'esito con stato_piano. Nulla viene scritto finché l'utente non approva.",
+          "Non generare né mostrare link in chat: l'utente è già nella piattaforma, digli solo di tornarci per " +
+          "rivedere e approvare il piano. All'approvazione l'app ESEGUE il piano automaticamente (un solo passo " +
+          "'Approva ed esegui'): NON devi chiamare esegui_piano. Verifica l'esito con stato_piano. Nulla viene " +
+          "scritto finché l'utente non approva.",
         inputSchema: {
           titolo: z.string().optional().describe('Titolo descrittivo del piano (es. "Import 40 clienti di test").'),
           azioni: z.array(z.object({
@@ -706,8 +744,8 @@ export function buildMcpServer(
             azioni: args.azioni as AzionePiano[],
           });
           return jsonResult({
-            ...res,
-            messaggio: `Piano creato con ${res.n_azioni} azioni. Mostra il link all'utente: all'approvazione l'app eseguirà il piano da sé (non chiamare esegui_piano). Poi verifica l'esito con stato_piano("${res.plan_id}"). Niente è ancora stato scritto.`,
+            ...omitLink(res),
+            messaggio: `Piano creato con ${res.n_azioni} azioni. Di' all'utente di tornare nella piattaforma per rivedere e approvare il piano (non generare né mostrare link; non chiamare esegui_piano): all'approvazione l'app eseguirà il piano da sé. Avvisa l'utente che, se non approva subito, appena avrà approvato o rifiutato in piattaforma dovrà dirtelo lui in chat. Poi chiama attendi_esito_piano("${res.plan_id}"): se rileva l'esito riferiscilo, se scade (scaduto_attesa: true) ricorda all'utente di avvisarti quando ha deciso. Niente è ancora stato scritto.`,
           });
         } catch (e: any) {
           return errorResult(`Proposta piano fallita: ${e?.message || String(e)}`);
@@ -725,8 +763,9 @@ export function buildMcpServer(
           "descrizione, una data, i punteggi RT2). Sostituisce TUTTE le azioni del piano con quelle che passi: " +
           "fornisci sempre l'elenco COMPLETO e aggiornato, non solo le differenze (puoi rileggere quelle correnti " +
           "con stato_piano, che ora restituisce anche le 'azioni'). Consentito solo finché il piano è 'pending' " +
-          "(non approvato/eseguito/scaduto). Non scrive sui dati: il piano resta da approvare, allo stesso link. " +
-          "Se il piano non è più modificabile, proponine uno nuovo con proponi_piano.",
+          "(non approvato/eseguito/scaduto). Non scrive sui dati: il piano resta da approvare nella piattaforma " +
+          "(non generare né mostrare link, di' solo di tornare in app). Se il piano non è più modificabile, " +
+          "proponine uno nuovo con proponi_piano.",
         inputSchema: {
           plan_id: z.string().uuid().describe('UUID del piano da aggiornare (da proponi_piano o stato_piano).'),
           titolo: z.string().optional().describe('Nuovo titolo del piano (opzionale).'),
@@ -744,8 +783,8 @@ export function buildMcpServer(
             azioni: args.azioni as AzionePiano[],
           });
           return jsonResult({
-            ...res,
-            messaggio: `Piano aggiornato (${res.n_azioni} azioni). Lo stesso link di approvazione resta valido: all'approvazione l'app eseguirà da sé. Verifica con stato_piano("${res.plan_id}"). Niente è ancora stato scritto.`,
+            ...omitLink(res),
+            messaggio: `Piano aggiornato (${res.n_azioni} azioni). Di' all'utente di tornare nella piattaforma per rivedere e approvare (non generare né mostrare link): all'approvazione l'app eseguirà da sé. Avvisa l'utente che, se non approva subito, appena avrà approvato o rifiutato in piattaforma dovrà dirtelo lui in chat. Poi chiama attendi_esito_piano("${res.plan_id}"): se rileva l'esito riferiscilo, se scade (scaduto_attesa: true) ricorda all'utente di avvisarti quando ha deciso. Niente è ancora stato scritto.`,
           });
         } catch (e: any) {
           return errorResult(`Aggiornamento piano fallito: ${e?.message || String(e)}`);
