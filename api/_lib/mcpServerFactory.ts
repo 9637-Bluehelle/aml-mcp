@@ -14,10 +14,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { modificaClienteSchema, modificaIncaricoSchema } from './mcpTools.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { salvaCliente } from './clienteService.js';
 import { creaSoggettoWithClient } from './personeService.js';
 import { tierAllows, type McpTier } from './mcpAuth.js';
-import { creaBozzaClienteSchema, creaSoggettoSchema, creaIncaricoSchema, creaValutazioneSchema, mapArgsToWizardData, mapArgsToPersona } from './mcpTools.js';
+import { creaBozzaClienteSchema, creaSoggettoSchema, creaIncaricoSchema, creaValutazioneSchema, mapArgsToPersona } from './mcpTools.js';
 import { proponiPiano, aggiornaPiano, eseguiPiano, statoPiano, attendiPiano, type AzionePiano } from './mcpPlans.js';
 import { descriviTipologie, preparaUploadDocumento, confermaUploadDocumento, caricaDocumentoBase64 } from './documentoService.js';
 import { descriviTipologiePrestazione, descriviImpostazioniIncarico } from './incaricoService.js';
@@ -552,34 +551,31 @@ export function buildMcpServer(
     server.registerTool(
       'crea_bozza_cliente',
       {
-        title: 'Crea bozza cliente',
+        title: 'Crea cliente (proposta da approvare)',
         description:
-          "Crea un nuovo cliente in stato BOZZA (draft) nello studio dell'utente. Usa i campi col suffisso del tipo " +
-          '(_pf persona fisica, _impresa impresa, _prof professionista). Resta una bozza inerte finché un operatore ' +
-          "non la completa/attiva nell'app. Le anagrafiche collegate sono create/deduplicate per CF. TITOLARI " +
+          "Propone la creazione di UN nuovo cliente nello studio dell'utente. NON scrive subito: crea una proposta " +
+          "che l'utente approva nella modale dedicata ai clienti; dopo l'approvazione l'app esegue da sé (il cliente " +
+          "nasce come bozza, da completare/attivare nell'app). Usa i campi col suffisso del tipo (_pf persona fisica, " +
+          "_impresa impresa, _prof professionista). Le anagrafiche collegate sono create/deduplicate per CF. TITOLARI " +
           "EFFETTIVI (imprese): se sono noti, passali nell'array strutturato 'titolari_effettivi' (uno per ogni " +
           "titolare, con ruolo/quota, CF, PEP, ecc.) — NON descriverli a parole nelle note di verifica, altrimenti " +
-          'non vengono registrati come veri titolari effettivi. Non attiva, non modifica record esistenti, non carica documenti.',
+          'non vengono registrati come veri titolari effettivi. Per creare cliente+incarico (+valutazione) insieme, usa proponi_piano (con i riferimenti "@passo:N").',
         inputSchema: creaBozzaClienteSchema,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       },
       async (args) => {
         try {
-          requireStudio(); // studio indeterminato → niente scrittura orfana (errore chiaro all'AI)
-          const result = await salvaCliente(client, mapArgsToWizardData(args as Record<string, unknown>), {
-            isComplete: false, // PoC/Fase4: sempre bozza (esecuzione diretta ammessa, §7.2)
-            activeStudioId: studioId,
+          requireStudio(); // studio indeterminato → niente piano orfano (errore chiaro all'AI)
+          const res = await proponiPiano(client, studioId, {
+            titolo: 'Creazione cliente',
+            azioni: [{ tool: 'crea_bozza_cliente', args: args as Record<string, any> }],
           });
           return jsonResult({
-            ok: true,
-            cliente_id: result.cliente?.id,
-            status: result.clientStatus,
-            anagrafica_id: result.clientePersonaId,
-            rappresentante_id: result.rappresentantePersonaId,
-            nota: "Bozza creata; va completata/attivata da un operatore nell'app.",
+            ...omitLink(res),
+            messaggio: `Proposta creata. Di' all'utente di tornare nella piattaforma per rivedere e approvare il nuovo cliente (non generare né mostrare link): all'approvazione l'app eseguirà da sé. Avvisa l'utente che, se non approva subito, appena avrà approvato o rifiutato in piattaforma dovrà dirtelo lui in chat. Poi chiama attendi_esito_piano("${res.plan_id}"): se rileva l'esito riferiscilo, se scade (scaduto_attesa: true) ricorda all'utente di avvisarti quando ha deciso. Niente è ancora stato scritto.`,
           });
         } catch (e: any) {
-          return errorResult(`Creazione bozza cliente fallita: ${e?.message || String(e)}`);
+          return errorResult(`Proposta creazione cliente fallita: ${e?.message || String(e)}`);
         }
       },
     );
