@@ -72,13 +72,11 @@ export function AzioniAiModale() {
   const [scartandoTutte, setScartandoTutte] = useState(false);
 
   const reload = useCallback(async () => {
-    const now = new Date().toISOString();
     const [{ data: planData, error }, { data: docData }, { data: stagingData }] = await Promise.all([
       supabase
         .from('mcp_pending_plans')
         .select('id, created_at')
         .eq('status', 'pending')
-        .gt('expires_at', now)
         .order('created_at', { ascending: true }),
       supabase
         .from('documenti')
