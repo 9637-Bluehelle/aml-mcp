@@ -457,7 +457,7 @@ export function buildMcpServer(
   server.registerTool(
     'attendi_esito_piano',
     {
-      title: 'Attendi esito di un piano (senza chiederlo all\'utente)',
+      title: 'Attendi esito di un piano',
       description:
         "Aspetta che l'utente approvi/rifiuti un piano (o che l'esecuzione finisca), invece di chiedere " +
         "all'utente di dirtelo. Chiamalo SUBITO dopo aver proposto/aggiornato un piano: la chiamata resta in " +
