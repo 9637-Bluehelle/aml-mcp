@@ -23,7 +23,6 @@ interface Piano {
   status: 'pending' | 'approved' | 'rejected' | 'executing' | 'executed' | 'expired' | 'failed';
   esito: any[] | null;
   created_at: string;
-  expires_at: string;
 }
 
 const STATUS_BADGE: Record<Piano['status'], { label: string; cls: string }> = {
@@ -128,7 +127,7 @@ export function PianoApprovazione({
     setLoading(true);
     const { data, error } = await supabase
       .from('mcp_pending_plans')
-      .select('id, titolo, azioni, status, esito, created_at, expires_at')
+      .select('id, titolo, azioni, status, esito, created_at')
       .eq('id', planId)
       .maybeSingle();
     if (error || !data) {
@@ -157,8 +156,6 @@ export function PianoApprovazione({
     return () => { supabase.removeChannel(channel); };
   }, [planId, reload]);
   useEffect(() => { editingRef.current = editing; }, [editing]);
-
-  const scaduto = piano ? new Date(piano.expires_at) < new Date() : false;
 
   async function decidi(approva: boolean) {
     setActing(true);
@@ -283,7 +280,7 @@ export function PianoApprovazione({
   }
 
   const badge = STATUS_BADGE[piano.status];
-  const decidibile = piano.status === 'pending' && !scaduto;
+  const decidibile = piano.status === 'pending';
 
   // Righe di dettaglio + (per le RT2) anteprima rischio, per una singola azione del piano.
   return (
@@ -297,12 +294,11 @@ export function PianoApprovazione({
         <div>
           <div className="text-sm font-medium text-gray-800">{piano.titolo || 'Piano senza titolo'}</div>
           <div className="text-xs text-gray-400">
-            {piano.azioni?.length ?? 0} azioni · creato {new Date(piano.created_at).toLocaleString('it-IT')} ·
-            {scaduto ? ' scaduto' : ` scade ${new Date(piano.expires_at).toLocaleString('it-IT')}`}
+            {piano.azioni?.length ?? 0} azioni · creato {new Date(piano.created_at).toLocaleString('it-IT')}
           </div>
         </div>
         <span className={`text-xs px-2.5 py-1 rounded-full ${badge.cls}`}>
-          {scaduto && piano.status === 'pending' ? 'Scaduto' : badge.label}
+          {badge.label}
         </span>
       </div>
 
@@ -424,7 +420,7 @@ export function PianoApprovazione({
           {piano.status === 'executed' && 'Piano approvato ed eseguito.'}
           {piano.status === 'rejected' && 'Piano rifiutato.'}
           {piano.status === 'executing' && 'Piano in esecuzione…'}
-          {(piano.status === 'expired' || (scaduto && piano.status === 'pending')) && 'Piano scaduto: non più eseguibile.'}
+          {piano.status === 'expired' && 'Piano scaduto: non più eseguibile.'}
         </div>
       ))}
     </PianoWrapper>
