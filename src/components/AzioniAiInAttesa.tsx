@@ -37,7 +37,6 @@ interface PianoRow {
   azioni: unknown[];
   status: 'pending' | 'approved' | 'rejected' | 'executing' | 'executed' | 'expired' | 'failed';
   created_at: string;
-  expires_at: string;
 }
 
 const STATUS_BADGE: Record<PianoRow['status'], { label: string; cls: string }> = {
@@ -51,16 +50,11 @@ const STATUS_BADGE: Record<PianoRow['status'], { label: string; cls: string }> =
   failed: { label: 'Errore esecuzione', cls: 'bg-orange-200 text-orange-900' },
 };
 
-function isScaduto(p: PianoRow): boolean {
-  return p.status === 'pending' && new Date(p.expires_at) < new Date();
-}
-
 // Riga di un piano nell'inbox: header cliccabile che apre la pagina di dettaglio/approvazione.
 // I dettagli delle azioni vivono SOLO in quella pagina (PianoApprovazione), non qui: evita di
 // ripetere lo stesso riquadro due volte (lista + dettaglio).
 function PianoRiga({ p, onApri }: { p: PianoRow; onApri: () => void }) {
   const badge = STATUS_BADGE[p.status];
-  const scaduto = isScaduto(p);
   const azioni = (p.azioni as Azione[]) ?? [];
   return (
     <div className="px-4 py-3">
@@ -72,8 +66,8 @@ function PianoRiga({ p, onApri }: { p: PianoRow; onApri: () => void }) {
           </div>
         </button>
         <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-xs px-2 py-0.5 rounded-full ${scaduto ? STATUS_BADGE.expired.cls : badge.cls}`}>
-            {scaduto ? 'Scaduto' : badge.label}
+          <span className={`text-xs px-2 py-0.5 rounded-full ${badge.cls}`}>
+            {badge.label}
           </span>
           <button onClick={onApri} className="text-gray-300 hover:text-gray-500" title="Apri">
             <ChevronRight className="w-4 h-4" />
@@ -103,7 +97,7 @@ export function AzioniAiInAttesa() {
     const [{ data, error }, { data: docData }] = await Promise.all([
       supabase
         .from('mcp_pending_plans')
-        .select('id, titolo, azioni, status, created_at, expires_at')
+        .select('id, titolo, azioni, status, created_at')
         .order('created_at', { ascending: false }),
       // Documenti MCP in attesa di approvazione dell'associazione (§5.1.3).
       supabase
@@ -193,8 +187,8 @@ export function AzioniAiInAttesa() {
     );
   }
 
-  const pending = piani.filter((p) => p.status === 'pending' && !isScaduto(p));
-  const storico = piani.filter((p) => !(p.status === 'pending' && !isScaduto(p)));
+  const pending = piani.filter((p) => p.status === 'pending');
+  const storico = piani.filter((p) => p.status !== 'pending');
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
