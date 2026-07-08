@@ -20,6 +20,7 @@ import { creaBozzaClienteSchema, creaSoggettoSchema, creaIncaricoSchema, creaVal
 import { proponiPiano, aggiornaPiano, eseguiPiano, statoPiano, attendiPiano, type AzionePiano } from './mcpPlans.js';
 import { descriviTipologie, preparaUploadDocumento, confermaUploadDocumento, caricaDocumentoBase64 } from './documentoService.js';
 import { descriviTipologiePrestazione, descriviImpostazioniIncarico } from './incaricoService.js';
+import { descriviImpostazioniCliente } from './clienteService.js';
 import { listaStaging, leggiStaging, proponiCatalogazione } from './documentiStagingService.js';
 
 function jsonResult(obj: unknown) {
@@ -526,19 +527,24 @@ export function buildMcpServer(
   server.registerTool(
     'descrivi_impostazioni_studio',
     {
-      title: 'Impostazioni dello studio (numerazione incarichi)',
+      title: 'Impostazioni dello studio (numerazione clienti e incarichi)',
       description:
-        "Restituisce le impostazioni dello studio rilevanti per le scritture: in particolare la numerazione del " +
-        "codice_incarico (manuale vs automatica). Consultalo PRIMA di proporre un incarico: se la numerazione è " +
-        "manuale devi fornire tu codice_incarico (seguendo la convenzione vista in lista_incarichi); se è " +
-        "automatica ometti il codice e lo genera il sistema. Evita il fallimento 'codice_incarico mancante'.",
+        "Restituisce le impostazioni dello studio rilevanti per le scritture: la numerazione del codice_cliente e " +
+        "del codice_incarico (manuale vs automatica). Consultalo PRIMA di proporre un cliente o un incarico: se la " +
+        "numerazione è manuale devi fornire tu il codice (seguendo la convenzione vista in lista_clienti / " +
+        "lista_incarichi); se è automatica ometti il codice e lo genera il sistema. Evita i fallimenti " +
+        "'codice_cliente mancante' / 'codice_incarico mancante'.",
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async () => {
       try {
         const sid = requireStudio();
-        return jsonResult(await descriviImpostazioniIncarico(client, sid));
+        const [cliente, incarico] = await Promise.all([
+          descriviImpostazioniCliente(client, sid),
+          descriviImpostazioniIncarico(client, sid),
+        ]);
+        return jsonResult({ ...cliente, ...incarico });
       } catch (e: any) {
         return errorResult(e?.message || String(e));
       }
@@ -559,7 +565,10 @@ export function buildMcpServer(
           "_impresa impresa, _prof professionista). Le anagrafiche collegate sono create/deduplicate per CF. TITOLARI " +
           "EFFETTIVI (imprese): se sono noti, passali nell'array strutturato 'titolari_effettivi' (uno per ogni " +
           "titolare, con ruolo/quota, CF, PEP, ecc.) — NON descriverli a parole nelle note di verifica, altrimenti " +
-          'non vengono registrati come veri titolari effettivi. Per creare cliente+incarico (+valutazione) insieme, usa proponi_piano (con i riferimenti "@passo:N").',
+          'non vengono registrati come veri titolari effettivi. Controlla con descrivi_impostazioni_studio se la ' +
+          'numerazione cliente è manuale: in tal caso fornisci codice_cliente (segui la convenzione degli altri ' +
+          'clienti, vedi lista_clienti); se è automatica ometti codice_cliente e lo genera il sistema. Per creare ' +
+          'cliente+incarico (+valutazione) insieme, usa proponi_piano (con i riferimenti "@passo:N").',
         inputSchema: creaBozzaClienteSchema,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       },
@@ -734,7 +743,7 @@ export function buildMcpServer(
     server.registerTool(
       'proponi_piano',
       {
-        title: 'Proponi piano (scrittura di massa)',
+        title: 'Proponi piano (scrittura massiva)',
         description:
           'Prepara un piano di N azioni di scrittura (crea_bozza_cliente / crea_soggetto / crea_incarico / ' +
           "crea_valutazione) da approvare in blocco da un umano PRIMA dell'esecuzione. Usa questo (invece dei " +
@@ -816,7 +825,7 @@ export function buildMcpServer(
     server.registerTool(
       'esegui_piano',
       {
-        title: 'Esegui piano approvato (di norma non serve)',
+        title: 'Esegui piano approvato',
         description:
           "DI NORMA NON SERVE: l'app esegue il piano già al momento dell'approvazione (pulsante 'Approva ed " +
           "esegui'). Usa questo SOLO come fallback se un piano risulta 'approved' ma non ancora eseguito. Esegue " +
