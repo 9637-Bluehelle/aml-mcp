@@ -59,8 +59,8 @@ export async function requireRole(
 export const creaBozzaClienteSchema = {
   tipo_cliente: z.enum(['persona_fisica', 'impresa', 'professionista'])
     .describe('Tipo di cliente. Determina quali altri campi sono pertinenti.'),
-  codice_cliente: z.string().min(1)
-    .describe("Codice identificativo del cliente, univoco nello studio (es. 'CLI-001')."),
+  codice_cliente: z.string().min(1).optional()
+    .describe("Codice identificativo del cliente, univoco nello studio. OMETTILO se lo studio usa numerazione AUTOMATICA (lo genera il sistema); FORNISCILO se è MANUALE — controlla con descrivi_impostazioni_studio e segui la convenzione degli altri clienti (lista_clienti). Es. 'CLI-001'."),
 
   // PERSONA FISICA
   nome_cognome_pf: z.string().optional().describe('[persona_fisica] Nome e cognome.'),
