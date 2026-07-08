@@ -204,6 +204,104 @@ async function prepareNodiCatenaData(
   return results;
 }
 
+// ---------------------------------------------------------------------------
+// Numerazione del codice cliente (mirror server-side di
+// src/lib/codiceGenerator.generateCodiceCliente): spiega all'AI la policy dello
+// studio e genera il codice quando NON è manuale, così l'AI non lo inventa fuori
+// convenzione. Simmetrico a descriviImpostazioniIncarico/generaCodiceIncarico.
+// ---------------------------------------------------------------------------
+
+type FormatoCodiceCliente = 'manuale' | 'sequenziale' | 'nome' | 'cf_piva' | string;
+
+interface ImpostazioniCliente {
+  formato: FormatoCodiceCliente;
+  prefisso_attivo: boolean;
+  prefisso: string;
+  sequenziale_inizio: number;
+  include_nome: boolean;
+  include_cf_piva: boolean;
+}
+
+function cleanNameCliente(name: string): string {
+  return name.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+function joinPartsCliente(parts: string[]): string {
+  return parts.filter(Boolean).join('-');
+}
+
+async function loadImpostazioniCliente(client: SupabaseClient, studioId: string): Promise<ImpostazioniCliente> {
+  const { data } = await client
+    .from('impostazioni_studio')
+    .select('formato_codice_cliente, prefisso_cliente_attivo, prefisso_cliente, sequenziale_inizio_cliente, cliente_include_nome, cliente_include_cf_piva')
+    .eq('studio_id', studioId)
+    .maybeSingle();
+  return {
+    formato: (data?.formato_codice_cliente as FormatoCodiceCliente) || 'manuale',
+    prefisso_attivo: data?.prefisso_cliente_attivo ?? true,
+    prefisso: data?.prefisso_cliente || 'CLI',
+    sequenziale_inizio: data?.sequenziale_inizio_cliente ?? 1,
+    include_nome: data?.cliente_include_nome ?? false,
+    include_cf_piva: data?.cliente_include_cf_piva ?? false,
+  };
+}
+
+/**
+ * Policy di numerazione del codice cliente dello studio, "spiegata" all'AI: serve a sapere PRIMA di
+ * proporre un cliente se il codice_cliente va fornito a mano (formato 'manuale') o se lo genera il
+ * sistema — evitando il fallimento "codice_cliente mancante" in esecuzione.
+ */
+export async function descriviImpostazioniCliente(
+  client: SupabaseClient,
+  studioId: string,
+): Promise<{ codice_cliente: { formato: string; manuale: boolean; nota: string } }> {
+  const imp = await loadImpostazioniCliente(client, studioId);
+  const manuale = imp.formato === 'manuale';
+  return {
+    codice_cliente: {
+      formato: imp.formato,
+      manuale,
+      nota: manuale
+        ? 'Numerazione MANUALE: devi fornire tu il codice_cliente in crea_bozza_cliente (segui la convenzione degli altri clienti dello studio, vedi lista_clienti).'
+        : 'Numerazione AUTOMATICA: ometti codice_cliente, lo genera il sistema. Se ne fornisci uno, viene usato quello.',
+    },
+  };
+}
+
+/**
+ * Genera il codice cliente secondo le impostazioni dello studio (mirror di
+ * src/lib/codiceGenerator.generateCodiceCliente), col conteggio scopato allo studio ed escludendo
+ * il cestino. Ritorna null se il formato è 'manuale' o mancano i dati richiesti dal formato scelto.
+ */
+async function generaCodiceCliente(
+  client: SupabaseClient,
+  studioId: string,
+  imp: ImpostazioniCliente,
+  cliente: { ragione_sociale?: string | null; codice_fiscale?: string | null; partita_iva?: string | null },
+): Promise<string | null> {
+  if (imp.formato === 'manuale') return null;
+  const prefix = imp.prefisso_attivo ? imp.prefisso : '';
+  const cfPiva = (cliente.codice_fiscale || cliente.partita_iva || '').toUpperCase().replace(/\s/g, '');
+
+  if (imp.formato === 'sequenziale') {
+    const { count } = await client
+      .from('clienti')
+      .select('*', { count: 'exact', head: true })
+      .eq('studio_id', studioId)
+      .is('deleted_at', null);
+    const next = (count || 0) + imp.sequenziale_inizio;
+    const nomePart = imp.include_nome && cliente.ragione_sociale ? cleanNameCliente(cliente.ragione_sociale) : '';
+    const cfPart = imp.include_cf_piva && cfPiva ? cfPiva : '';
+    return joinPartsCliente([prefix, nomePart, cfPart, String(next).padStart(3, '0')]);
+  }
+  if (imp.formato === 'cf_piva') {
+    return cfPiva ? joinPartsCliente([prefix, cfPiva]) : null;
+  }
+  if (imp.formato === 'nome') {
+    return cliente.ragione_sociale ? joinPartsCliente([prefix, cleanNameCliente(cliente.ragione_sociale)]) : null;
+  }
+  return null;
+}
+
 /**
  * Salva (INSERT o UPDATE) un cliente con tutte le sue entità relazionali (anagrafiche,
  * titolari effettivi, catena di controllo). Logica identica a quella che viveva in
@@ -553,7 +651,22 @@ export async function salvaCliente(
       }
     }
   } else {
-    // INSERT nuovo cliente
+    // INSERT nuovo cliente.
+    // Codice cliente: se non fornito, generalo dalle impostazioni studio (mirror di salvaIncarico).
+    // Formato 'manuale' senza codice → errore chiaro, invece di inserire un cliente senza codice.
+    if (!clienteData.codice_cliente && activeStudioId) {
+      const imp = await loadImpostazioniCliente(client, activeStudioId);
+      const generato = await generaCodiceCliente(client, activeStudioId, imp, {
+        ragione_sociale: clienteData.ragione_sociale,
+        codice_fiscale: clienteData.codice_fiscale,
+        partita_iva: clienteData.partita_iva,
+      });
+      if (!generato) {
+        throw new Error('codice_cliente mancante: lo studio usa la numerazione manuale (o mancano i dati per generarlo). Fornisci codice_cliente.');
+      }
+      clienteData.codice_cliente = generato;
+    }
+
     const { data: newCliente, error: clienteError } = await client
       .from('clienti')
       .insert(clienteData)
