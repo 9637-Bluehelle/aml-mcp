@@ -35,6 +35,7 @@ import { DettaglioIncaricoPage } from './IncaricoDettModifica';
 import { ClienteDettaglioView } from './ClienteDettaglioShared';
 import { ClienteWizard } from './cliente-wizard';
 import { Pagination } from './Pagination';
+import { LoadingMore } from './LoadingMore';
 import { fetchAllInBatches } from '../lib/fetchAll';
 // Lazy: xlsx + tabella code page (~900KB) restano fuori dal bundle principale e
 // vengono caricati solo all'apertura dell'import.
@@ -260,6 +261,7 @@ export function FascicoloCliente({} = {}) {
   const [tipoFilter, setTipoFilter] = useState<'tutti' | 'persona_fisica' | 'impresa' | 'professionista'>('tutti');
   const [statusFilter, setStatusFilter] = useState<'tutti' | 'draft' | 'active'>('tutti');
   const [loading, setLoading] = useState(true);
+  const [loadingMoreClienti, setLoadingMoreClienti] = useState(false);
   const [archiveFolder, setArchiveFolder] = useState<'attivi' | 'archiviati'>('attivi');
 
   // Ordinamento lista clienti
@@ -814,24 +816,35 @@ export function FascicoloCliente({} = {}) {
 
   async function loadClienti() {
     setLoading(true);
-    // Caricamento a blocchi per superare il cap di 1000 righe di Supabase: ricerca, filtri
-    // e ordinamento restano lato client sull'intero elenco caricato in `clienti`.
+    setLoadingMoreClienti(false);
+    // Caricamento progressivo a blocchi per superare il cap di 1000 righe di Supabase: ricerca,
+    // filtri e ordinamento restano lato client sull'intero elenco caricato in `clienti`. Ordine per
+    // created_at desc (= sort di default) + id, così pagina 1 non si rimescola durante lo streaming.
     const buildQuery = () => {
       let query = supabase
         .from('clienti')
         .select('*')
         .is('deleted_at', null)
-        .order('ragione_sociale');
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true });
       if (activeStudioId) query = query.eq('studio_id', activeStudioId);
       return query;
     };
+    let first = true;
     try {
-      const data = await fetchAllInBatches<Cliente>(buildQuery);
-      setClienti(data);
+      await fetchAllInBatches<Cliente>(buildQuery, {
+        onBatch: (all) => {
+          setClienti(all);
+          // Primo blocco: togli lo spinner principale, il resto continua in sottofondo.
+          if (first) { first = false; setLoading(false); setLoadingMoreClienti(true); }
+        },
+      });
+      if (first) setClienti([]); // zero righe: onBatch non è mai stato invocato
     } catch (err) {
       console.error('Errore caricamento clienti:', err);
     } finally {
       setLoading(false);
+      setLoadingMoreClienti(false);
     }
   }
 
@@ -1395,6 +1408,7 @@ export function FascicoloCliente({} = {}) {
                 )}
               </div>
             )}
+            {loadingMoreClienti && <LoadingMore />}
             <Pagination page={currentClientiPage} pageCount={clientiPageCount} onPageChange={setClientiPage} />
           </div>
         )}
