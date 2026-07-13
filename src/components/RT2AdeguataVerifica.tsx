@@ -7,6 +7,7 @@ import { Save, Search, FileText, Users, X, /*AlertTriangle, Shield,*/ RefreshCw,
 import { supabase } from '../lib/supabase';
 import { fetchAllInBatches } from '../lib/fetchAll';
 import { Pagination } from './Pagination';
+import { LoadingMore } from './LoadingMore';
 import { enrichClienteWithRappresentante, loadTitolariWithPersona, /*findPersoneIdByCliente*/ } from '../lib/personeHelper';
 import { amlData, getPrestazione } from '../lib/aml-data';
 import { /*calculateRT2Scores, */ RT2TabellaA, RT2TabellaB, /*RT2FattoreRischio, createDefaultTabellaA, createDefaultTabellaB*/ } from '../lib/calculations';
@@ -244,11 +245,13 @@ export function useAppData() {
   const [clienti, setClienti] = useState<any[]>([]);
   const [incarichi, setIncarichi] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { activeStudioId } = useStudio();
 
   async function loadData() {
     setLoading(true);
+    setLoadingMore(false);
     // try/finally: `loading` viene SEMPRE riazzerato (anche su sessione assente o errore), così un
     // blip di auth/rete non blocca l'app in caricamento all'infinito.
     try {
@@ -274,47 +277,58 @@ export function useAppData() {
         emailMap[user.id] = 'Utente';
       }
 
-      // Caricamento a blocchi per superare il cap di 1000 righe di Supabase su ENTRAMBE le liste
-      // (i clienti e — soprattutto — gli incarichi, che crescono più in fretta). Ricerca, filtri e
-      // ordinamento restano lato client sull'elenco completo. L'`.order('id')` garantisce una
-      // paginazione stabile tra un blocco e l'altro.
+      // Caricamento progressivo a blocchi per superare il cap di 1000 righe di Supabase su ENTRAMBE
+      // le liste (i clienti e — soprattutto — gli incarichi, che crescono più in fretta). Ricerca,
+      // filtri e ordinamento restano lato client sull'elenco completo. Ordine per created_at desc
+      // (= sort di default) + id: paginazione stabile tra i blocchi e pagina 1 che non si rimescola.
       // Errori NON ignorati: fetchAllInBatches propaga l'errore, catturato dal try/catch esterno che
       // NON azzera le liste (eviti di mostrare "0 clienti" come fosse un dato reale) e segnala l'errore.
-      const buildClientiQuery = () => {
-        let q = supabase.from('clienti').select('*').is('deleted_at', null).order('id', { ascending: true });
-        if (studioId) q = q.eq('studio_id', studioId);
-        return q;
-      };
-      const buildIncarichiQuery = () => {
-        let q = supabase.from('incarichi').select('*').is('deleted_at', null).order('id', { ascending: true });
-        if (studioId) q = q.eq('studio_id', studioId);
-        return q;
-      };
-      const [clientiData, incarichiData] = await Promise.all([
-        fetchAllInBatches<any>(buildClientiQuery),
-        fetchAllInBatches<any>(buildIncarichiQuery),
-      ]);
-
       const addOwnerLabel = (item: any) => ({
         ...item,
         ownerEmail: emailMap[item.user_id] || "Utente sconosciuto",
         isMine: item.user_id === user.id
       });
 
-      setClienti(clientiData.map(addOwnerLabel));
-      setIncarichi(incarichiData.map(addOwnerLabel));
+      const buildClientiQuery = () => {
+        let q = supabase.from('clienti').select('*').is('deleted_at', null)
+          .order('created_at', { ascending: false }).order('id', { ascending: true });
+        if (studioId) q = q.eq('studio_id', studioId);
+        return q;
+      };
+      const buildIncarichiQuery = () => {
+        let q = supabase.from('incarichi').select('*').is('deleted_at', null)
+          .order('created_at', { ascending: false }).order('id', { ascending: true });
+        if (studioId) q = q.eq('studio_id', studioId);
+        return q;
+      };
+
+      // Appena arriva il primo blocco (di una qualsiasi delle due liste) togliamo lo spinner
+      // principale e passiamo all'indicatore "caricamento altri" finché entrambe non completano.
+      let first = true;
+      const markFirst = () => { if (first) { first = false; setLoading(false); setLoadingMore(true); } };
+
+      await Promise.all([
+        fetchAllInBatches<any>(buildClientiQuery, {
+          onBatch: (all) => { setClienti(all.map(addOwnerLabel)); markFirst(); },
+        }),
+        fetchAllInBatches<any>(buildIncarichiQuery, {
+          onBatch: (all) => { setIncarichi(all.map(addOwnerLabel)); markFirst(); },
+        }),
+      ]);
+      if (first) { setClienti([]); setIncarichi([]); } // entrambe vuote: onBatch mai invocato
       setError(null);
     } catch (e: any) {
       console.error('useAppData.loadData error:', e);
       setError(e?.message || String(e));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }
 
   useEffect(() => { loadData(); }, [activeStudioId]);
 
-  return { clienti, incarichi, loading, error, loadData };
+  return { clienti, incarichi, loading, loadingMore, error, loadData };
 }
 
 // Helper function per convertire date ISO in formato italiano
@@ -391,7 +405,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
   const toast = useToast();
   const confirm = useConfirm();
 
-  const {clienti, incarichi, loading, loadData} = useAppData();
+  const {clienti, incarichi, loading, loadingMore, loadData} = useAppData();
   const [valutazioni, setValutazioni] = useState<Valutazione[]>([]);
   const [incaricoCompleto, setIncaricoCompleto] = useState<IncaricoCompleto | null>(null);
   const [selectedCliente, setSelectedCliente] = useState('');
@@ -2288,6 +2302,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
                 ))}
               </div>
             )}
+            {loadingMore && <LoadingMore />}
             <Pagination page={currentArchClientiPage} pageCount={archClientiPageCount} onPageChange={setArchClientiPage} />
           </Card>
 
@@ -2364,6 +2379,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
                 })}
               </div>
             )}
+            {loadingMore && <LoadingMore />}
             <Pagination page={currentArchIncarichiPage} pageCount={archIncarichiPageCount} onPageChange={setArchIncarichiPage} />
           </Card>
         </div>
@@ -2488,6 +2504,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
               ))}
             </div>
           )}
+          {loadingMore && <LoadingMore />}
           <Pagination page={currentClientiPage} pageCount={clientiPageCount} onPageChange={setClientiPage} />
         </Card>
 
@@ -2562,6 +2579,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
               })}
             </div>
           )}
+          {loadingMore && <LoadingMore />}
           <Pagination page={currentIncarichiPage} pageCount={incarichiPageCount} onPageChange={setIncarichiPage} />
         </Card>
       </div>
