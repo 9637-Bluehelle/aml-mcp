@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Key, Plus, Trash2, Copy, ShieldCheck, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, PlusIcon, MoreHorizontal, Bell, BellOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from './Toast';
-import { notificheSupportate, permessoNotifiche, notificheAbilitate, setNotifichePreferenza, richiediPermessoNotifiche } from '../lib/webNotifications';
+import { notificheSupportate, permessoNotifiche, notificheAbilitate, setNotifichePreferenza, richiediPermessoNotifiche, salvaPreferenzaNotificheDB, sincronizzaPreferenzaNotificheDaDB } from '../lib/webNotifications';
  
 type Tier = 'read' | 'draft' | 'modify';
  
@@ -91,6 +91,7 @@ export function AccessoMcpSettings() {
     if (notifOn) {
       setNotifichePreferenza(false);
       setNotifOn(false);
+      await salvaPreferenzaNotificheDB(false);
       return;
     }
     const p = await richiediPermessoNotifiche();
@@ -98,11 +99,17 @@ export function AccessoMcpSettings() {
     if (p === 'granted') {
       setNotifichePreferenza(true);
       setNotifOn(true);
+      await salvaPreferenzaNotificheDB(true);
       toast.success('Notifiche browser attivate.');
     } else if (p === 'denied') {
       toast.error('Permesso negato dal browser: riattivalo dalle impostazioni del sito.');
     }
   };
+
+  // All'apertura: allinea la preferenza locale a quella salvata sul profilo (DB) e aggiorna il toggle.
+  useEffect(() => {
+    sincronizzaPreferenzaNotificheDaDB().then(() => setNotifOn(notificheAbilitate()));
+  }, []);
 
   const endpointUrl = `${window.location.origin}/api/mcp`;
  
