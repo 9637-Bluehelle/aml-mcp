@@ -614,11 +614,14 @@ async function loadCestinoSettings(): Promise<CestinoSettings> {
 async function saveCestinoSettings(settings: CestinoSettings): Promise<{ error: string | null }> {
   const studioId = await getMyStudioId();
   if (!studioId) return { error: 'Studio non determinato.' };
-  // Upsert sulla stessa riga dei codici (onConflict studio_id): viene chiamata
-  // dopo saveImpostazioni, quindi la riga esiste già e questo è di fatto un update.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Sessione non valida.' };
+  // Upsert sulla stessa riga dei codici (onConflict studio_id). Includiamo user_id (colonna
+  // NOT NULL) come fa saveImpostazioni: così l'upsert regge anche se dovesse INSERIRE una riga
+  // nuova (riga inesistente) e non solo aggiornarla, invece di fallire con un 400 (23502).
   const { error } = await supabase
     .from('impostazioni_studio')
-    .upsert({ studio_id: studioId, ...settings }, { onConflict: 'studio_id' });
+    .upsert({ studio_id: studioId, user_id: user.id, ...settings }, { onConflict: 'studio_id' });
   return { error: error ? error.message : null };
 }
 
