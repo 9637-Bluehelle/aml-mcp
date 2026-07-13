@@ -12,6 +12,7 @@ import { MieSegnalazioni } from './MieSegnalazioni';
 import { TutorialModal } from './TutorialModal';
 import { useStudio } from '../lib/StudioContext';
 import { useUnreadSegnalazioni } from './UnreadSegnalazioniProvider';
+import { mostraNotificaAI } from '../lib/webNotifications';
 
 interface LayoutProps {
   children: ReactNode;
@@ -57,6 +58,10 @@ export function Layout({ children, activeTab, onTabChange, ruolo }: LayoutProps)
   const menuRef = useRef<HTMLDivElement>(null);
   const helpMenuRef = useRef<HTMLDivElement>(null);
   const studioSelectRef = useRef<HTMLDivElement>(null);
+  // onTabChange in un ref: la subscription realtime (deps []) usa sempre l'ultima versione senza
+  // ri-sottoscriversi ad ogni render.
+  const onTabChangeRef = useRef(onTabChange);
+  onTabChangeRef.current = onTabChange;
 
   useEffect(() => {
     const handleOffline = () => {
@@ -176,10 +181,32 @@ export function Layout({ children, activeTab, onTabChange, ruolo }: LayoutProps)
       if (attivo) setMcpPendingCount((piani || 0) + (documenti || 0));
     };
     aggiorna();
+    // Al click sulla notifica: porta la tab in primo piano (in webNotifications) e vai all'inbox.
+    const vaiAzioniAi = () => onTabChangeRef.current('azioni_ai');
     const channel = supabase
       .channel('mcp-plans-badge')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mcp_pending_plans' }, aggiorna)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'documenti' }, aggiorna)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mcp_pending_plans' }, (payload) => {
+        aggiorna();
+        if (payload.eventType === 'INSERT' && (payload.new as { status?: string })?.status === 'pending') {
+          mostraNotificaAI({
+            title: 'Nuova azione AI in attesa',
+            body: "L'AI ha proposto un piano da approvare.",
+            tag: `mcp-plan-${(payload.new as { id?: string }).id}`,
+            onClick: vaiAzioniAi,
+          });
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documenti' }, (payload) => {
+        aggiorna();
+        if (payload.eventType === 'INSERT' && (payload.new as { mcp_stato?: string })?.mcp_stato === 'pending') {
+          mostraNotificaAI({
+            title: 'Documento AI da approvare',
+            body: "L'AI ha proposto un documento da approvare.",
+            tag: `mcp-doc-${(payload.new as { id?: string }).id}`,
+            onClick: vaiAzioniAi,
+          });
+        }
+      })
       .subscribe();
     return () => { attivo = false; supabase.removeChannel(channel); };
   }, []);
