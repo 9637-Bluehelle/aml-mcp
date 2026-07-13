@@ -34,6 +34,8 @@ import { DocumentiAllegati } from './DocumentiAllegati';
 import { DettaglioIncaricoPage } from './IncaricoDettModifica';
 import { ClienteDettaglioView } from './ClienteDettaglioShared';
 import { ClienteWizard } from './cliente-wizard';
+import { Pagination } from './Pagination';
+import { fetchAllInBatches } from '../lib/fetchAll';
 // Lazy: xlsx + tabella code page (~900KB) restano fuori dal bundle principale e
 // vengono caricati solo all'apertura dell'import.
 const ImportClientiModal = lazy(() => import('./ImportClientiModal').then(m => ({ default: m.ImportClientiModal })));
@@ -271,6 +273,9 @@ export function FascicoloCliente({} = {}) {
     { field: 'codice_cliente', dir: 'desc', label: 'Codice Z→A' },
   ];
   const [clienteSort, setClienteSort] = useState(0);
+  // Paginazione client-side della lista clienti
+  const CLIENTI_PAGE_SIZE = 25;
+  const [clientiPage, setClientiPage] = useState(1);
 
   // Dati del fascicolo per il cliente selezionato
   const [incarichi, setIncarichi] = useState<Incarico[]>([]);
@@ -809,15 +814,25 @@ export function FascicoloCliente({} = {}) {
 
   async function loadClienti() {
     setLoading(true);
-    let query = supabase
-      .from('clienti')
-      .select('*')
-      .is('deleted_at', null)
-      .order('ragione_sociale');
-    if (activeStudioId) query = query.eq('studio_id', activeStudioId);
-    const { data, error } = await query;
-    if (!error && data) setClienti(data);
-    setLoading(false);
+    // Caricamento a blocchi per superare il cap di 1000 righe di Supabase: ricerca, filtri
+    // e ordinamento restano lato client sull'intero elenco caricato in `clienti`.
+    const buildQuery = () => {
+      let query = supabase
+        .from('clienti')
+        .select('*')
+        .is('deleted_at', null)
+        .order('ragione_sociale');
+      if (activeStudioId) query = query.eq('studio_id', activeStudioId);
+      return query;
+    };
+    try {
+      const data = await fetchAllInBatches<Cliente>(buildQuery);
+      setClienti(data);
+    } catch (err) {
+      console.error('Errore caricamento clienti:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadFascicoloData(clienteId: string) {
@@ -1079,6 +1094,18 @@ export function FascicoloCliente({} = {}) {
   //const archivedCount = clienti.filter(c => c.archiviato).length;
   const totalForFolder = clienti.filter(c => archiveFolder === 'archiviati' ? c.archiviato : !c.archiviato).length;
 
+  // Paginazione client-side: ricerca/filtri/ordinamento restano su tutto l'elenco caricato,
+  // qui impaginiamo solo le righe renderizzate.
+  const clientiPageCount = Math.max(1, Math.ceil(filteredClienti.length / CLIENTI_PAGE_SIZE));
+  const currentClientiPage = Math.min(clientiPage, clientiPageCount);
+  const paginatedClienti = filteredClienti.slice(
+    (currentClientiPage - 1) * CLIENTI_PAGE_SIZE,
+    currentClientiPage * CLIENTI_PAGE_SIZE,
+  );
+
+  // Torna a pagina 1 quando cambiano ricerca, filtri, ordinamento o cartella archivio.
+  useEffect(() => { setClientiPage(1); }, [search, tipoFilter, statusFilter, archiveFolder, clienteSort]);
+
   // Archivia / Ripristina cliente
   const toggleArchiviaCliente = async (cliente: Cliente, archivio: boolean) => {
     const msg = archivio
@@ -1301,7 +1328,7 @@ export function FascicoloCliente({} = {}) {
           <Spinner/></>
         ) : (
           <div className="space-y-2">
-            {filteredClienti.map(cliente => (
+            {paginatedClienti.map(cliente => (
               <div
                 key={cliente.id}
                 data-cliente-id={cliente.id}
@@ -1368,6 +1395,7 @@ export function FascicoloCliente({} = {}) {
                 )}
               </div>
             )}
+            <Pagination page={currentClientiPage} pageCount={clientiPageCount} onPageChange={setClientiPage} />
           </div>
         )}
       </div>
