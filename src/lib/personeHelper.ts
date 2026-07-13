@@ -319,7 +319,11 @@ function mapPersonaRow(r: any): PersonaFisicaRecord {
 /**
  * Elenca tutte le persone fisiche dell'utente corrente.
  */
-export async function listPersone(search?: string, studioId?: string | null): Promise<PersonaFisicaRecord[]> {
+export async function listPersone(
+  search?: string,
+  studioId?: string | null,
+  onBatch?: (persone: PersonaFisicaRecord[]) => void,
+): Promise<PersonaFisicaRecord[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
@@ -331,13 +335,15 @@ export async function listPersone(search?: string, studioId?: string | null): Pr
 
   // Costruttore di query fresca per ogni blocco: la ricerca resta lato server, quindi il
   // caricamento a blocchi scorre comunque l'intero insieme dei risultati coerenti con la
-  // ricerca (nessun cap silenzioso a 1000 righe).
+  // ricerca (nessun cap silenzioso a 1000 righe). Ordine per created_at desc (= sort di default
+  // della UI) + id per stabilità: così durante il caricamento progressivo pagina 1 non si rimescola.
   const buildQuery = () => {
     let query = supabase
       .from('anagrafica_soggetti')
       .select('*')
       .is('deleted_at', null)
-      .order('nome_cognome', { ascending: true });
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true });
 
     if (studioId) query = query.eq('studio_id', studioId);
 
@@ -349,7 +355,10 @@ export async function listPersone(search?: string, studioId?: string | null): Pr
   };
 
   try {
-    const data = await fetchAllInBatches<any>(buildQuery);
+    const data = await fetchAllInBatches<any>(buildQuery, {
+      // Ogni blocco: rimappa l'accumulato e notifica il chiamante per il rendering progressivo.
+      onBatch: onBatch ? (all) => onBatch(all.map(mapPersonaRow)) : undefined,
+    });
     return data.map(mapPersonaRow);
   } catch (err) {
     console.error('Errore caricamento anagrafiche:', err);
