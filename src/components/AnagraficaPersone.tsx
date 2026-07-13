@@ -21,6 +21,10 @@ import { NAZIONALITA, getNazioneByNazionalita, isItaliana } from '../lib/naziona
 import { IndirizzoStructured } from './cliente-wizard/components/forms/IndirizzoStructured';
 import { CodiceAtecoSearch } from './cliente-wizard/components/forms/CodiceAtecoSearch';
 import { useStudio } from '../lib/StudioContext';
+import { Pagination } from './Pagination';
+
+// Numero di anagrafiche per pagina (griglia a 3 colonne → 8 righe).
+const PAGE_SIZE = 24;
 
 // ---------- Sotto-componente: badge ruolo ----------
 function RuoloBadge({ ruolo }: { ruolo: string }) {
@@ -1003,6 +1007,7 @@ export function AnagraficaPersone() {
     { field: 'nome_cognome', dir: 'desc', label: 'Nome Z→A' },
   ];
   const [sortIndex, setSortIndex] = useState(0);
+  const [page, setPage] = useState(1);
   const [modalPersona, setModalPersona] = useState<PersonaFisicaRecord | null | undefined>(undefined);
   // undefined = chiuso, null = nuova, PersonaFisicaRecord = modifica
   useScrollLock(modalPersona !== undefined);
@@ -1049,6 +1054,9 @@ export function AnagraficaPersone() {
     return () => clearTimeout(timer);
   }, [load]);
 
+  // Torna alla prima pagina quando cambiano ricerca, filtro o ordinamento.
+  useEffect(() => { setPage(1); }, [search, tipoFilter, sortIndex]);
+
   // Applica il filtro tipo lato client (autodetect via CF per record legacy senza tipo_soggetto)
   const filteredPersone = persone
     .filter(p => {
@@ -1063,6 +1071,12 @@ export function AnagraficaPersone() {
       const cmp = va.localeCompare(vb, 'it', { numeric: true });
       return opt.dir === 'asc' ? cmp : -cmp;
     });
+
+  // Paginazione client-side: la ricerca/i filtri lavorano sull'intero dataset in memoria,
+  // qui impaginiamo solo la vista renderizzata.
+  const pageCount = Math.max(1, Math.ceil(filteredPersone.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedPersone = filteredPersone.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
 
   return (
@@ -1187,8 +1201,9 @@ export function AnagraficaPersone() {
           )}
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredPersone.map((p) => (
+          {paginatedPersone.map((p) => (
             <PersonaCard
               key={p.id}
               persona={p}
@@ -1197,6 +1212,8 @@ export function AnagraficaPersone() {
             />
           ))}
         </div>
+        <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
+        </>
       )}
 
       {/* Modale creazione / modifica */}
