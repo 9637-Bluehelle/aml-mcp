@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, ReactNode} from 'react';
 import { Card } from './Card';
 import { AlertTriangle, CheckCircle, ExternalLink} from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { fetchAllInBatches } from '../lib/fetchAll';
+import { Pagination } from './Pagination';
 import { useAppData } from './RT2AdeguataVerifica';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { Spinner } from './cliente-wizard/modals/Spinner';
@@ -811,6 +813,9 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filter, setFilter] = useState<'all' | 'no_incarichi' | 'no_valutazioni' | 'draft' | 'scadenza' | 'rt1_scadenza' | 'doc_scadenza' | 'controlli_scadenza'>('all');
   const [loadingAlerts, setLoadingAlerts] = useState(true);
+  // Paginazione client-side della lista alert
+  const ALERTS_PAGE_SIZE = 20;
+  const [alertsPage, setAlertsPage] = useState(1);
 
   const { alertCounts } = useAlertCounts();
   const { checkSystemAlerts,  isCheckingAlerts, lastCheckMessage, refreshToken } = useSystemAlerts();
@@ -822,23 +827,35 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
     if (loading) return;
     setLoadingAlerts(true);
 
-    let query = supabase
-      .from('alert')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (activeStudioId) query = query.eq('studio_id', activeStudioId);
+    // Caricamento a blocchi per superare il cap di 1000 righe di Supabase: in uno studio grande
+    // gli alert (più d'uno per cliente/incarico) possono superare quota. Il doppio `.order`
+    // (created_at + id) garantisce una paginazione stabile tra un blocco e l'altro.
+    const buildQuery = () => {
+      let query = supabase
+        .from('alert')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
+      if (activeStudioId) query = query.eq('studio_id', activeStudioId);
 
-    if (filter === 'no_incarichi') query = query.eq('tipo_rt', 'RT4');
-    else if (filter === 'no_valutazioni') query = query.eq('tipo_rt', 'RT2');
-    else if (filter === 'draft') query = query.eq('tipo_rt', 'RT2-DRAFT');
-    else if (filter === 'scadenza') query = query.eq('tipo_rt', 'RT2-SCADENZA');
-    else if (filter === 'rt1_scadenza') query = query.eq('tipo_rt', 'RT1-SCADENZA');
-    else if (filter === 'doc_scadenza') query = query.eq('tipo_rt', 'DOC-SCADENZA');
-    else if (filter === 'controlli_scadenza') query = query.eq('tipo_rt', 'RT4-SCADENZA');
+      if (filter === 'no_incarichi') query = query.eq('tipo_rt', 'RT4');
+      else if (filter === 'no_valutazioni') query = query.eq('tipo_rt', 'RT2');
+      else if (filter === 'draft') query = query.eq('tipo_rt', 'RT2-DRAFT');
+      else if (filter === 'scadenza') query = query.eq('tipo_rt', 'RT2-SCADENZA');
+      else if (filter === 'rt1_scadenza') query = query.eq('tipo_rt', 'RT1-SCADENZA');
+      else if (filter === 'doc_scadenza') query = query.eq('tipo_rt', 'DOC-SCADENZA');
+      else if (filter === 'controlli_scadenza') query = query.eq('tipo_rt', 'RT4-SCADENZA');
+      return query;
+    };
 
-    const { data } = await query;
-    if (data) setAlerts(data);
-    setLoadingAlerts(false);
+    try {
+      const data = await fetchAllInBatches<Alert>(buildQuery);
+      setAlerts(data);
+    } catch (e) {
+      console.error('Errore caricamento alert:', e);
+    } finally {
+      setLoadingAlerts(false);
+    }
   }
 
   useEffect(() => {
@@ -847,6 +864,17 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
       /*loadAlertCounts();*/
     }
   }, [filter, refreshToken, loading, clienti, incarichi]);
+
+  // Torna a pagina 1 al cambio filtro.
+  useEffect(() => { setAlertsPage(1); }, [filter]);
+
+  // Paginazione client-side: gli alert sono già caricati per intero, qui impaginiamo la vista.
+  const alertsPageCount = Math.max(1, Math.ceil(alerts.length / ALERTS_PAGE_SIZE));
+  const currentAlertsPage = Math.min(alertsPage, alertsPageCount);
+  const paginatedAlerts = alerts.slice(
+    (currentAlertsPage - 1) * ALERTS_PAGE_SIZE,
+    currentAlertsPage * ALERTS_PAGE_SIZE,
+  );
 
 
   async function handleAlertClick(alert: Alert) {
@@ -1007,7 +1035,7 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
         </Card>
       ) : (
         <div className="space-y-3">
-          {alerts.map(alert => {
+          {paginatedAlerts.map(alert => {
             const isClickable = !!onNavigate && !!alert.riferimento_id;
             return (
             <Card key={alert.id}>
@@ -1047,6 +1075,7 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
             </Card>
             );
           })}
+          <Pagination page={currentAlertsPage} pageCount={alertsPageCount} onPageChange={setAlertsPage} />
         </div>
       )}
     </div>
