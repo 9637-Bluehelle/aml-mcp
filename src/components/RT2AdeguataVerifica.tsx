@@ -5,6 +5,8 @@ import { ValutazioneRischioForm } from './ValutazioneRischioForm';
 //import { RiskBadge } from './RiskBadge';
 import { Save, Search, FileText, Users, X, /*AlertTriangle, Shield,*/ RefreshCw, CheckCircle, ArrowUpDown, Archive, RotateCcw, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { fetchAllInBatches } from '../lib/fetchAll';
+import { Pagination } from './Pagination';
 import { enrichClienteWithRappresentante, loadTitolariWithPersona, /*findPersoneIdByCliente*/ } from '../lib/personeHelper';
 import { amlData, getPrestazione } from '../lib/aml-data';
 import { /*calculateRT2Scores, */ RT2TabellaA, RT2TabellaB, /*RT2FattoreRischio, createDefaultTabellaA, createDefaultTabellaB*/ } from '../lib/calculations';
@@ -272,17 +274,26 @@ export function useAppData() {
         emailMap[user.id] = 'Utente';
       }
 
-      let qClienti = supabase.from('clienti').select('*').is('deleted_at', null);
-      let qIncarichi = supabase.from('incarichi').select('*').is('deleted_at', null);
-      if (studioId) {
-        qClienti = qClienti.eq('studio_id', studioId);
-        qIncarichi = qIncarichi.eq('studio_id', studioId);
-      }
-      const [clientiRes, incarichiRes] = await Promise.all([qClienti, qIncarichi]);
-      // Errori NON ignorati: su errore RLS/rete NON azzeriamo le liste (eviti di mostrare "0 clienti"
-      // come fosse un dato reale) e segnaliamo l'errore al chiamante.
-      if (clientiRes.error) throw clientiRes.error;
-      if (incarichiRes.error) throw incarichiRes.error;
+      // Caricamento a blocchi per superare il cap di 1000 righe di Supabase su ENTRAMBE le liste
+      // (i clienti e — soprattutto — gli incarichi, che crescono più in fretta). Ricerca, filtri e
+      // ordinamento restano lato client sull'elenco completo. L'`.order('id')` garantisce una
+      // paginazione stabile tra un blocco e l'altro.
+      // Errori NON ignorati: fetchAllInBatches propaga l'errore, catturato dal try/catch esterno che
+      // NON azzera le liste (eviti di mostrare "0 clienti" come fosse un dato reale) e segnala l'errore.
+      const buildClientiQuery = () => {
+        let q = supabase.from('clienti').select('*').is('deleted_at', null).order('id', { ascending: true });
+        if (studioId) q = q.eq('studio_id', studioId);
+        return q;
+      };
+      const buildIncarichiQuery = () => {
+        let q = supabase.from('incarichi').select('*').is('deleted_at', null).order('id', { ascending: true });
+        if (studioId) q = q.eq('studio_id', studioId);
+        return q;
+      };
+      const [clientiData, incarichiData] = await Promise.all([
+        fetchAllInBatches<any>(buildClientiQuery),
+        fetchAllInBatches<any>(buildIncarichiQuery),
+      ]);
 
       const addOwnerLabel = (item: any) => ({
         ...item,
@@ -290,8 +301,8 @@ export function useAppData() {
         isMine: item.user_id === user.id
       });
 
-      setClienti((clientiRes.data ?? []).map(addOwnerLabel));
-      setIncarichi((incarichiRes.data ?? []).map(addOwnerLabel));
+      setClienti(clientiData.map(addOwnerLabel));
+      setIncarichi(incarichiData.map(addOwnerLabel));
       setError(null);
     } catch (e: any) {
       console.error('useAppData.loadData error:', e);
@@ -469,6 +480,11 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
   ];
   const [clienteSort, setClienteSort] = useState(0); // indice in clienteSortOptions
   const [incaricoSort, setIncaricoSort] = useState(0);
+
+  // Paginazione client-side delle liste principali (clienti / incarichi attivi)
+  const RT2_PAGE_SIZE = 25;
+  const [clientiPage, setClientiPage] = useState(1);
+  const [incarichiPage, setIncarichiPage] = useState(1);
   
   // Stati per la ricerca cliente nel form nuovo incarico
   const [clienteSearchQuery, setClienteSearchQuery] = useState('');
@@ -959,6 +975,26 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
     const cmp = va.localeCompare(vb, 'it', { numeric: true });
     return opt.dir === 'asc' ? cmp : -cmp;
   });
+
+  // Paginazione client-side: ricerca/ordinamento lavorano sull'elenco completo in memoria,
+  // qui impaginiamo solo le righe renderizzate.
+  const clientiPageCount = Math.max(1, Math.ceil(filteredClienti.length / RT2_PAGE_SIZE));
+  const currentClientiPage = Math.min(clientiPage, clientiPageCount);
+  const paginatedClienti = filteredClienti.slice(
+    (currentClientiPage - 1) * RT2_PAGE_SIZE,
+    currentClientiPage * RT2_PAGE_SIZE,
+  );
+
+  const incarichiPageCount = Math.max(1, Math.ceil(filteredIncarichi.length / RT2_PAGE_SIZE));
+  const currentIncarichiPage = Math.min(incarichiPage, incarichiPageCount);
+  const paginatedIncarichi = filteredIncarichi.slice(
+    (currentIncarichiPage - 1) * RT2_PAGE_SIZE,
+    currentIncarichiPage * RT2_PAGE_SIZE,
+  );
+
+  // Torna a pagina 1 quando cambiano ricerca o ordinamento.
+  useEffect(() => { setClientiPage(1); }, [searchClienteQuery, clienteSort]);
+  useEffect(() => { setIncarichiPage(1); }, [searchIncaricoQuery, incaricoSort]);
 
   // Funzione per visualizzare il dettaglio del cliente
   async function handleViewClienteDetail(clienteId: string) {
@@ -2406,7 +2442,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
             </div>
           ) : (
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-              {filteredClienti.map(cliente => (
+              {paginatedClienti.map(cliente => (
                 <div key={cliente.id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-between transition-colors cursor-pointer" onClick={() => handleViewClienteDetail(cliente.id)}>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -2430,6 +2466,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
               ))}
             </div>
           )}
+          <Pagination page={currentClientiPage} pageCount={clientiPageCount} onPageChange={setClientiPage} />
         </Card>
 
         <Card title="Incarichi" icon={<FileText className="w-5 h-5 text-blue-600" />}>
@@ -2482,7 +2519,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
             </div>
           ) : (
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-              {filteredIncarichi.map(incarico => {
+              {paginatedIncarichi.map(incarico => {
                 const prest = getPrestazione(incarico.tipologia_prestazione_id);
                 return (
                   <div key={incarico.id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => handleViewEvaluations(incarico.id)}>
@@ -2503,6 +2540,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
               })}
             </div>
           )}
+          <Pagination page={currentIncarichiPage} pageCount={incarichiPageCount} onPageChange={setIncarichiPage} />
         </Card>
       </div>
     </div>
