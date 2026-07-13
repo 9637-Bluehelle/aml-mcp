@@ -62,6 +62,8 @@ export function Layout({ children, activeTab, onTabChange, ruolo }: LayoutProps)
   // ri-sottoscriversi ad ogni render.
   const onTabChangeRef = useRef(onTabChange);
   onTabChangeRef.current = onTabChange;
+  // Titolo originale della scheda, per ripristinarlo quando non ci sono azioni AI in attesa.
+  const baseTitleRef = useRef(typeof document !== 'undefined' ? document.title : '');
 
   useEffect(() => {
     const handleOffline = () => {
@@ -212,6 +214,16 @@ export function Layout({ children, activeTab, onTabChange, ruolo }: LayoutProps)
       .subscribe();
     return () => { attivo = false; supabase.removeChannel(channel); };
   }, []);
+
+  // Indicatore nel TITOLO della scheda: quando ci sono azioni AI in attesa, il conteggio compare nel
+  // titolo della tab del browser (visibile su qualsiasi monitor, dove l'utente ha il browser). Si
+  // ripulisce da sé quando le azioni scendono a 0. Complementa la notifica OS (che il SO piazza sul
+  // monitor primario, fuori dal nostro controllo).
+  useEffect(() => {
+    const base = baseTitleRef.current;
+    document.title = mcpPendingCount > 0 ? `(${mcpPendingCount}) 🔔 ${base}` : base;
+    return () => { document.title = base; };
+  }, [mcpPendingCount]);
 
   const handleLogoutClick = () => {
     setIsUserMenuOpen(false);
