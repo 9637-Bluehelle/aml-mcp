@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle, ExternalLink} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { fetchAllInBatches } from '../lib/fetchAll';
 import { Pagination } from './Pagination';
+import { LoadingMore } from './LoadingMore';
 import { useAppData } from './RT2AdeguataVerifica';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { Spinner } from './cliente-wizard/modals/Spinner';
@@ -813,6 +814,7 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filter, setFilter] = useState<'all' | 'no_incarichi' | 'no_valutazioni' | 'draft' | 'scadenza' | 'rt1_scadenza' | 'doc_scadenza' | 'controlli_scadenza'>('all');
   const [loadingAlerts, setLoadingAlerts] = useState(true);
+  const [loadingMoreAlerts, setLoadingMoreAlerts] = useState(false);
   // Paginazione client-side della lista alert
   const ALERTS_PAGE_SIZE = 20;
   const [alertsPage, setAlertsPage] = useState(1);
@@ -826,9 +828,10 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
   async function loadAlerts() {
     if (loading) return;
     setLoadingAlerts(true);
+    setLoadingMoreAlerts(false);
 
-    // Caricamento a blocchi per superare il cap di 1000 righe di Supabase: in uno studio grande
-    // gli alert (più d'uno per cliente/incarico) possono superare quota. Il doppio `.order`
+    // Caricamento progressivo a blocchi per superare il cap di 1000 righe di Supabase: in uno studio
+    // grande gli alert (più d'uno per cliente/incarico) possono superare quota. Il doppio `.order`
     // (created_at + id) garantisce una paginazione stabile tra un blocco e l'altro.
     const buildQuery = () => {
       let query = supabase
@@ -848,13 +851,21 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
       return query;
     };
 
+    let first = true;
     try {
-      const data = await fetchAllInBatches<Alert>(buildQuery);
-      setAlerts(data);
+      await fetchAllInBatches<Alert>(buildQuery, {
+        onBatch: (all) => {
+          setAlerts(all);
+          // Primo blocco: togli lo spinner principale, il resto continua in sottofondo.
+          if (first) { first = false; setLoadingAlerts(false); setLoadingMoreAlerts(true); }
+        },
+      });
+      if (first) setAlerts([]); // zero righe: onBatch non è mai stato invocato
     } catch (e) {
       console.error('Errore caricamento alert:', e);
     } finally {
       setLoadingAlerts(false);
+      setLoadingMoreAlerts(false);
     }
   }
 
@@ -1075,6 +1086,7 @@ export function AlertPanel({ onNavigate }: { onNavigate?: (tab: string) => void 
             </Card>
             );
           })}
+          {loadingMoreAlerts && <LoadingMore />}
           <Pagination page={currentAlertsPage} pageCount={alertsPageCount} onPageChange={setAlertsPage} />
         </div>
       )}
