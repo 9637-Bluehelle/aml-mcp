@@ -4,6 +4,8 @@
 // Worker / Web Push — quello servirebbe per la tab CHIUSA, fuori da questo step. Richiede HTTPS
 // (ok su Vercel/localhost).
 
+import { supabase } from './supabase';
+
 const PREF_KEY = 'mcp_web_notifications';
 
 export function notificheSupportate(): boolean {
@@ -25,6 +27,50 @@ export function notificheAbilitate(): boolean {
 export function setNotifichePreferenza(on: boolean): void {
   if (on) localStorage.setItem(PREF_KEY, '1');
   else localStorage.removeItem(PREF_KEY);
+}
+
+/**
+ * Salva la preferenza anche sul profilo (DB), così l'intento on/off sopravvive al cambio
+ * dispositivo / pulizia dati del sito. Il PERMESSO del browser resta per-dispositivo. Best-effort:
+ * se fallisce, la preferenza locale (localStorage) resta comunque valida per questo browser.
+ */
+export async function salvaPreferenzaNotificheDB(on: boolean): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('user_profiles').update({ mcp_notifiche_web: on }).eq('user_id', user.id);
+  } catch {
+    // Best-effort: la preferenza locale è già stata scritta, non blocchiamo l'utente.
+  }
+}
+
+/**
+ * All'avvio: allinea la preferenza locale (localStorage) a quella salvata sul profilo (DB), così
+ * l'intento segue l'utente tra dispositivi/sessioni.
+ *  - DB = true/false → è la fonte di verità: rispecchialo in locale.
+ *  - DB = NULL (mai impostata) → se in locale era attiva (utente pre-esistente), MIGRA quella
+ *    preferenza sul DB invece di spegnerla; altrimenti lascia lo stato locale invariato.
+ * Il permesso del browser non viene toccato (è per-dispositivo).
+ */
+export async function sincronizzaPreferenzaNotificheDaDB(): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('mcp_notifiche_web')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!data) return;
+    const dbPref = data.mcp_notifiche_web as boolean | null;
+    if (dbPref === null) {
+      if (localStorage.getItem(PREF_KEY) === '1') await salvaPreferenzaNotificheDB(true);
+      return;
+    }
+    setNotifichePreferenza(dbPref);
+  } catch {
+    // Best-effort.
+  }
 }
 
 /** Va chiamata da un gesto utente (click del toggle). Ritorna il permesso risultante. */
