@@ -481,10 +481,12 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
   const [clienteSort, setClienteSort] = useState(0); // indice in clienteSortOptions
   const [incaricoSort, setIncaricoSort] = useState(0);
 
-  // Paginazione client-side delle liste principali (clienti / incarichi attivi)
+  // Paginazione client-side delle liste principali (clienti / incarichi attivi) e archiviate
   const RT2_PAGE_SIZE = 25;
   const [clientiPage, setClientiPage] = useState(1);
   const [incarichiPage, setIncarichiPage] = useState(1);
+  const [archClientiPage, setArchClientiPage] = useState(1);
+  const [archIncarichiPage, setArchIncarichiPage] = useState(1);
   
   // Stati per la ricerca cliente nel form nuovo incarico
   const [clienteSearchQuery, setClienteSearchQuery] = useState('');
@@ -947,6 +949,24 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
 
   const totalArchivedClienti = clienti.filter(c => c.archiviato).length;
   const totalArchivedIncarichi = incarichi.filter(i => i.archiviato).length;
+
+  // Paginazione client-side delle liste archiviate.
+  const archClientiPageCount = Math.max(1, Math.ceil(archivedClienti.length / RT2_PAGE_SIZE));
+  const currentArchClientiPage = Math.min(archClientiPage, archClientiPageCount);
+  const paginatedArchClienti = archivedClienti.slice(
+    (currentArchClientiPage - 1) * RT2_PAGE_SIZE,
+    currentArchClientiPage * RT2_PAGE_SIZE,
+  );
+
+  const archIncarichiPageCount = Math.max(1, Math.ceil(archivedIncarichi.length / RT2_PAGE_SIZE));
+  const currentArchIncarichiPage = Math.min(archIncarichiPage, archIncarichiPageCount);
+  const paginatedArchIncarichi = archivedIncarichi.slice(
+    (currentArchIncarichiPage - 1) * RT2_PAGE_SIZE,
+    currentArchIncarichiPage * RT2_PAGE_SIZE,
+  );
+
+  useEffect(() => { setArchClientiPage(1); }, [searchArchClienteQuery, archClienteSort]);
+  useEffect(() => { setArchIncarichiPage(1); }, [searchArchIncaricoQuery, archIncaricoSort]);
   
   // Filtro incarichi per la vista valutazione rischio
   /*const filteredIncarichiForEvaluate = incarichi.filter(incarico => {
@@ -2251,7 +2271,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
               <p className="text-gray-500 text-sm py-4 text-center">Nessun cliente archiviato.</p>
             ) : (
               <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                {archivedClienti.map(c => (
+                {paginatedArchClienti.map(c => (
                   <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg bg-amber-50/50">
                     <div>
                       <p className="font-medium text-gray-900">{c.ragione_sociale}</p>
@@ -2268,6 +2288,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
                 ))}
               </div>
             )}
+            <Pagination page={currentArchClientiPage} pageCount={archClientiPageCount} onPageChange={setArchClientiPage} />
           </Card>
 
           {/* Incarichi archiviati */}
@@ -2321,7 +2342,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
               <p className="text-gray-500 text-sm py-4 text-center">Nessun incarico archiviato.</p>
             ) : (
               <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                {archivedIncarichi.map(i => {
+                {paginatedArchIncarichi.map(i => {
                   const cliente = clienti.find(c => c.id === i.cliente_id);
                   return (
                     <div key={i.id} className="flex items-center justify-between p-3 border rounded-lg bg-amber-50/50">
@@ -2343,6 +2364,7 @@ export function RT2AdeguataVerifica({ onNavigate }: { onNavigate?: (tab: string)
                 })}
               </div>
             )}
+            <Pagination page={currentArchIncarichiPage} pageCount={archIncarichiPageCount} onPageChange={setArchIncarichiPage} />
           </Card>
         </div>
       </div>
