@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { fetchAllInBatches } from './fetchAll';
 import { parseCodiceFiscale, formatDate } from '../components/cliente-wizard/components/forms/PersonaFisicaForm';
 import { getActiveStudioIdHolder } from './studioHelper';
 import { savePersonaWithClient, findSoggettoEsistenteWithClient } from '../../api/_lib/personeService';
@@ -322,26 +323,38 @@ export async function listPersone(search?: string, studioId?: string | null): Pr
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  let query = supabase
-    .from('anagrafica_soggetti')
-    .select('*')
-    .is('deleted_at', null)
-    .order('nome_cognome', { ascending: true });
+  // Stessa sanitizzazione di cercaPersone: rimuove i caratteri che rompono/iniettano il parser
+  // PostgREST `.or()` (l'interpolazione grezza era il difetto).
+  const term = (search && search.trim().length >= 2)
+    ? search.trim().replace(/[%,()*]/g, '')
+    : '';
 
-  if (studioId) query = query.eq('studio_id', studioId);
+  // Costruttore di query fresca per ogni blocco: la ricerca resta lato server, quindi il
+  // caricamento a blocchi scorre comunque l'intero insieme dei risultati coerenti con la
+  // ricerca (nessun cap silenzioso a 1000 righe).
+  const buildQuery = () => {
+    let query = supabase
+      .from('anagrafica_soggetti')
+      .select('*')
+      .is('deleted_at', null)
+      .order('nome_cognome', { ascending: true });
 
-  if (search && search.trim().length >= 2) {
-    // Stessa sanitizzazione di cercaPersone: rimuove i caratteri che rompono/iniettano il parser
-    // PostgREST `.or()` (l'interpolazione grezza era il difetto).
-    const term = search.trim().replace(/[%,()*]/g, '');
+    if (studioId) query = query.eq('studio_id', studioId);
+
     if (term.length >= 2) {
       const q = `%${term}%`;
       query = query.or(`nome_cognome.ilike.${q},codice_fiscale.ilike.${q},partita_iva.ilike.${q}`);
     }
-  }
+    return query;
+  };
 
-  const { data } = await query;
-  return (data || []).map(mapPersonaRow);
+  try {
+    const data = await fetchAllInBatches<any>(buildQuery);
+    return data.map(mapPersonaRow);
+  } catch (err) {
+    console.error('Errore caricamento anagrafiche:', err);
+    return [];
+  }
 }
 
 /**
