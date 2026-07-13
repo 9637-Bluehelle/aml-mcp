@@ -7,9 +7,10 @@
 // Self-contained: gestisce il proprio stato, non tocca il dirty-tracking di Impostazioni.
  
 import { useState, useEffect, useCallback } from 'react';
-import { Key, Plus, Trash2, Copy, ShieldCheck, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, PlusIcon, MoreHorizontal } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, ShieldCheck, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, PlusIcon, MoreHorizontal, Bell, BellOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from './Toast';
+import { notificheSupportate, permessoNotifiche, notificheAbilitate, setNotifichePreferenza, richiediPermessoNotifiche } from '../lib/webNotifications';
  
 type Tier = 'read' | 'draft' | 'modify';
  
@@ -79,7 +80,30 @@ export function AccessoMcpSettings() {
   const [ttlDays, setTtlDays] = useState<number | ''>(30);
  
   const [newPat, setNewPat] = useState<string | null>(null);
- 
+
+  // Notifiche browser (in-page): preferenza utente + permesso del browser (distinti).
+  const notifSupportate = notificheSupportate();
+  const [notifOn, setNotifOn] = useState(notificheAbilitate());
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission>(permessoNotifiche());
+
+  const toggleNotifiche = async () => {
+    if (!notifSupportate) { toast.error('Il tuo browser non supporta le notifiche.'); return; }
+    if (notifOn) {
+      setNotifichePreferenza(false);
+      setNotifOn(false);
+      return;
+    }
+    const p = await richiediPermessoNotifiche();
+    setNotifPerm(p);
+    if (p === 'granted') {
+      setNotifichePreferenza(true);
+      setNotifOn(true);
+      toast.success('Notifiche browser attivate.');
+    } else if (p === 'denied') {
+      toast.error('Permesso negato dal browser: riattivalo dalle impostazioni del sito.');
+    }
+  };
+
   const endpointUrl = `${window.location.origin}/api/mcp`;
  
   const reload = useCallback(async (background = false) => {
@@ -247,7 +271,36 @@ export function AccessoMcpSettings() {
           <Copy className="w-4 h-4" />
         </button>
       </div>
- 
+
+      {/* Notifiche browser: avviso quando l'AI propone qualcosa mentre sei su un'altra scheda. */}
+      <div className="border border-gray-200 rounded-lg p-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {notifOn ? <Bell className="w-4 h-4 text-blue-600" /> : <BellOff className="w-4 h-4 text-gray-400" />}
+            <div className="text-sm font-medium text-gray-800">Notifiche browser</div>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Ricevi un avviso del browser quando l'AI propone un'azione da approvare, anche mentre stai guardando un'altra scheda (es. la chat). Serve che questa scheda della piattaforma resti aperta.
+          </p>
+          {!notifSupportate && (
+            <p className="text-[11px] text-amber-600 mt-1">Il tuo browser non supporta le notifiche.</p>
+          )}
+          {notifSupportate && notifPerm === 'denied' && (
+            <p className="text-[11px] text-amber-600 mt-1">Permesso negato: riattivalo dalle impostazioni del sito nel browser.</p>
+          )}
+        </div>
+        <button
+          onClick={toggleNotifiche}
+          disabled={!notifSupportate}
+          role="switch"
+          aria-checked={notifOn}
+          title="Attiva/disattiva notifiche browser"
+          className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${notifOn ? 'bg-blue-600' : 'bg-gray-300'}`}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifOn ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+      </div>
+
       {/* Guida Claude Desktop via connettore (OAuth) — via consigliata, senza token. */}
       <div className="border border-gray-200 rounded-lg">
         <button
