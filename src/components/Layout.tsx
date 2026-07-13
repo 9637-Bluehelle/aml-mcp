@@ -12,7 +12,7 @@ import { MieSegnalazioni } from './MieSegnalazioni';
 import { TutorialModal } from './TutorialModal';
 import { useStudio } from '../lib/StudioContext';
 import { useUnreadSegnalazioni } from './UnreadSegnalazioniProvider';
-import { mostraNotificaAI } from '../lib/webNotifications';
+import { mostraNotificaAI, sincronizzaPreferenzaNotificheDaDB } from '../lib/webNotifications';
 
 interface LayoutProps {
   children: ReactNode;
@@ -167,6 +167,8 @@ export function Layout({ children, activeTab, onTabChange, ruolo }: LayoutProps)
   // limita ai propri piani; non dipende dallo studio. Se la tabella non esiste, resta 0.
   useEffect(() => {
     let attivo = true;
+    // All'avvio: allinea la preferenza notifiche locale a quella salvata sul profilo (DB).
+    sincronizzaPreferenzaNotificheDaDB();
     const aggiorna = async () => {
       const [{ count: piani }, { count: documenti }] = await Promise.all([
         supabase
