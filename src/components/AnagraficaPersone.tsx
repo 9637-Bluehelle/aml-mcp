@@ -22,6 +22,7 @@ import { IndirizzoStructured } from './cliente-wizard/components/forms/Indirizzo
 import { CodiceAtecoSearch } from './cliente-wizard/components/forms/CodiceAtecoSearch';
 import { useStudio } from '../lib/StudioContext';
 import { Pagination } from './Pagination';
+import { LoadingMore } from './LoadingMore';
 
 // Numero di anagrafiche per pagina (griglia a 3 colonne → 8 righe).
 const PAGE_SIZE = 24;
@@ -996,6 +997,7 @@ export function AnagraficaPersone() {
   const toast = useToast();
   const [persone, setPersone] = useState<PersonaFisicaRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<'tutti' | 'persona_fisica' | 'azienda'>('tutti');
   // Ordinamento lista anagrafica
@@ -1018,10 +1020,18 @@ export function AnagraficaPersone() {
   const load = useCallback(async () => {
     const seq = ++loadSeqRef.current;
     setLoading(true);
-    const data = await listPersone(search, activeStudioId);
+    setLoadingMore(false);
+    let first = true;
+    await listPersone(search, activeStudioId, (batch) => {
+      if (seq !== loadSeqRef.current) return; // risposta di un load precedente: ignora
+      setPersone(batch);
+      // Primo blocco arrivato: togli lo spinner principale, il resto continua in sottofondo.
+      if (first) { first = false; setLoading(false); setLoadingMore(true); }
+    });
     if (seq !== loadSeqRef.current) return; // arrivata in ritardo, ignora
-    setPersone(data);
+    if (first) setPersone([]); // zero risultati: onBatch non è mai stato invocato
     setLoading(false);
+    setLoadingMore(false);
   }, [search, activeStudioId]);
 
   const puoCestina = useCestinaPermesso();
@@ -1212,6 +1222,7 @@ export function AnagraficaPersone() {
             />
           ))}
         </div>
+        {loadingMore && <LoadingMore />}
         <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
         </>
       )}
