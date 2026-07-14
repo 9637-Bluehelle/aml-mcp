@@ -10,8 +10,7 @@
 // (creazione cliente / incarico). La chiave è il nome del vincolo così come lo riporta Postgres.
 const VINCOLI_UNIQUE: Record<string, string> = {
   clienti_codice_cliente_studio_unique:
-    'Esiste già un cliente con questo codice nello studio: molto probabilmente il cliente è già ' +
-    'presente in anagrafica. Verifica prima di ricrearlo.',
+    'Esiste già un cliente con questo codice nello studio. Verifica prima di ricrearlo.',
   incarichi_codice_incarico_key:
     'Esiste già un incarico con questo codice. Usa un codice incarico diverso o verifica se ' +
     "l'incarico è già presente.",
