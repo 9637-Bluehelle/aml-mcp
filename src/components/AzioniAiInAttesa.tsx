@@ -12,6 +12,7 @@ import { DettaglioAzione } from './DettaglioAzione';
 import { useToast } from './Toast';
 import { TIPOLOGIE_DOCUMENTO } from '../../api/_lib/documentoService';
 import { righeDocumento } from '../lib/dettaglioAzioni';
+import { umanizzaErrore } from '../lib/erroriLeggibili';
 
 interface Azione { tool: string; args?: Record<string, any> }
 
@@ -146,7 +147,7 @@ export function AzioniAiInAttesa() {
     setActingDoc(id);
     const { error } = await supabase.from('documenti').update({ mcp_stato: 'approved' }).eq('id', id);
     setActingDoc(null);
-    if (error) { toast.error(`Approvazione fallita: ${error.message}`); return; }
+    if (error) { toast.error(`Approvazione fallita: ${umanizzaErrore(error.message)}`); return; }
     toast.success('Associazione documento approvata. L\'AI può finalizzare (conferma_upload_documento).');
     reload();
   }, [reload, toast]);
@@ -157,7 +158,7 @@ export function AzioniAiInAttesa() {
     if (d.file_path) await supabase.storage.from('file_allegati').remove([d.file_path]).catch(() => {});
     const { error } = await supabase.from('documenti').delete().eq('id', d.id);
     setActingDoc(null);
-    if (error) { toast.error(`Rifiuto fallito: ${error.message}`); return; }
+    if (error) { toast.error(`Rifiuto fallito: ${umanizzaErrore(error.message)}`); return; }
     toast.success('Documento rifiutato ed eliminato.');
     reload();
   }, [reload, toast]);
