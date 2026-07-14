@@ -20,7 +20,7 @@ const VINCOLI_UNIQUE: Record<string, string> = {
  * Restituisce un messaggio d'errore adatto all'utente. Accetta una stringa, un Error o qualsiasi
  * valore (ne estrae `.message` se presente). Su pattern non riconosciuti torna il testo originale.
  */
-export function umanizzaErrore(raw: unknown): string {
+export function explainError(raw: unknown): string {
   const msg =
     typeof raw === 'string' ? raw : ((raw as any)?.message ?? String(raw ?? ''));
   if (!msg) return 'Si è verificato un errore imprevisto.';
