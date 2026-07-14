@@ -14,6 +14,7 @@ import { DettaglioAzione, ContenutoDettaglio } from './DettaglioAzione';
 import { TOOL_LABEL, riassuntoArgs, buildDettaglioAzione, type ContestoNomi } from '../lib/dettaglioAzioni';
 import { risolviNomiAzioni } from '../lib/risolviAzioni';
 import { AzioneEditor, setArgPath, haCampiEditabili } from './AzioneEditor';
+import { umanizzaErrore } from '../lib/erroriLeggibili';
 
 interface Azione { tool: string; args: Record<string, any>; }
 interface Piano {
@@ -170,7 +171,7 @@ export function PianoApprovazione({
         .update(patch)
         .eq('id', planId)
         .eq('status', 'pending'); // solo se ancora in attesa (evita corse)
-      if (error) { toast.error(`Operazione fallita: ${error.message}`); return; }
+      if (error) { toast.error(`Operazione fallita: ${umanizzaErrore(error.message)}`); return; }
 
       // Approva ED esegui in un solo passo: niente più "dì all'AI di eseguire". L'esecuzione gira
       // sotto la sessione dell'utente che approva (RLS piena; le scritture risultano sue). Il claim
@@ -192,7 +193,7 @@ export function PianoApprovazione({
           else toast.success(`Piano approvato ed eseguito (${res.eseguite} ${res.eseguite === 1 ? 'azione' : 'azioni'}).`);
         } catch (e: any) {
           // Approvato ma esecuzione fallita: il piano resta 'approved', ritentabile.
-          toast.error(`Esecuzione fallita: ${e?.message || String(e)}. Il piano resta approvato: riprova.`);
+          toast.error(`Esecuzione fallita: ${umanizzaErrore(e)}. Il piano resta approvato: riprova.`);
         }
       } else {
         toast.success('Piano rifiutato.');
@@ -378,7 +379,7 @@ export function PianoApprovazione({
               </div>
               {esito && !editing && !esito.ok && esito.error && (
                 <div className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-words">
-                  {esito.error}
+                  {umanizzaErrore(esito.error)}
                 </div>
               )}
             </div>
