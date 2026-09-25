@@ -1,0 +1,351 @@
+--- a/ClienteWizard_FIXED_v2.tsx
++++ b/ClienteWizard_FIXED_v2.tsx
+@@ -36,12 +36,6 @@ interface DocumentoIdentita {
+   ente_rilascio: string;
+ }
+ 
+-interface TitolareEffettivoBase {
+-  nome: string;
+-  codice_fiscale: string;
+-  data_nascita: string;
+-  metodo_verifica: string;
+-  note: string;
+-}
+ 
+ interface WizardData {
+   // Tipo cliente
+@@ -67,7 +61,6 @@ interface WizardData {
+   documento_rappresentante?: DocumentoIdentita;
+   pep_impresa?: boolean;
+   sanzioni_impresa?: boolean;
+-  titolare_effettivo_base?: TitolareEffettivoBase;
+   
+   // PROFESSIONISTA
+   nome_cognome_prof?: string;
+@@ -152,12 +145,6 @@ export function ClienteWizard({ onComplete, onCancel }: ClienteWizardProps) {
+     documento_rappresentante: { tipo: '', numero: '', data_rilascio: '', data_scadenza: '', ente_rilascio: '' },
+     pep_impresa: false,
+     sanzioni_impresa: false,
+-    titolare_effettivo_base: {
+-      nome: '',
+-      codice_fiscale: '',
+-      data_nascita: '',
+-      metodo_verifica: '',
+-      note: ''
+-    },
+     
+     // PROFESSIONISTA
+     nome_cognome_prof: '',
+@@ -283,6 +270,81 @@ export function ClienteWizard({ onComplete, onCancel }: ClienteWizardProps) {
+     return { city: locationStr, province: '' };
+   };
+ 
++  const formatDate = (dateStr: string): string => {
++    if (!dateStr) return '';
++    try {
++      const datePart = dateStr.split('T')[0];
++      return datePart;
++    } catch {
++      return '';
++    }
++  };
++
++  const getLegalRepresentative = (managers: any[]): any => {
++    if (!managers || managers.length === 0) return null;
++    
++    for (const manager of managers) {
++      if (manager.isLegalRepresentative && manager.name) {
++        return manager;
++      }
++    }
++    
++    for (const manager of managers) {
++      if (manager.name) {
++        return manager;
++      }
++    }
++    
++    return null;
++  };
++
++  const getBeneficialOwners = (shareholders: any[], managers: any[]): TitolareEffettivo[] => {
++    const owners: TitolareEffettivo[] = [];
++    
++    // Azionisti con quota > 25%
++    for (const shareholder of shareholders) {
++      if (shareholder.percentShare > 25) {
++        for (const info of shareholder.shareholdersInformation || []) {
++          const birthPlace = extractLocationParts(info.birthTown || '');
++          owners.push({
++            tipo_rapporto: 'societa_ente',
++            nome_cognome: info.companyName || `${info.name || ''} ${info.surname || ''}`.trim(),
++            professione: 'Azionista',
++            comune_nascita: birthPlace.city,
++            provincia_nascita: birthPlace.province,
++            data_nascita: formatDate(info.birthDate || ''),
++            comune_residenza: '',
++            via_residenza: '',
++            numero_civico: '',
++            codice_fiscale: info.taxCode || '',
++            documento_tipo: '',
++            documento_numero: '',
++            documento_rilascio_ente: '',
++            documento_rilascio_data: '',
++            documento_scadenza: '',
++            is_pep: false,
++            pep_carica: '',
++            pep_legame: `Quota: ${shareholder.percentShare}%`
++          });
++        }
++      }
++    }
++    
++    // Se nessun azionista, usa amministratori
++    if (owners.length === 0 && managers) {
++      for (const manager of managers) {
++        if (manager.name) {
++          const roles = manager.roles?.map((r: any) => r.role?.description || '').join(', ') || 'Amministratore';
++          const birthPlace = extractLocationParts(manager.birthTown || '');
++          
++          owners.push({
++            tipo_rapporto: 'caso_residuale',
++            nome_cognome: `${manager.name || ''} ${manager.surname || ''}`.trim(),
++            professione: roles,
++            comune_nascita: birthPlace.city,
++            provincia_nascita: birthPlace.province,
++            data_nascita: formatDate(manager.birthDate || ''),
++            comune_residenza: '',
++            via_residenza: '',
++            numero_civico: '',
++            codice_fiscale: manager.taxCode || '',
++            documento_tipo: '',
++            documento_numero: '',
++            documento_rilascio_ente: '',
++            documento_rilascio_data: '',
++            documento_scadenza: '',
++            is_pep: false,
++            pep_carica: '',
++            pep_legame: ''
++          });
++        }
++      }
++    }
++    
++    return owners;
++  };
++
+   // CHIAMATA API AML
+   const handleAPISearch = async () => {
+     const normalizedVat = normalizeVatOrCF(apiVatInput);
+@@ -321,29 +383,44 @@ export function ClienteWizard({ onComplete, onCancel }: ClienteWizardProps) {
+       responseData: data
+     });
+ 
+-      // Mapping dei dati dall'API a formData (SOLO PER IMPRESE)
+-      // IMPORTANTE: L'API ritorna { data: { companyDetails: {...}, address: {...} } }
+-      const apiData = data.data || data; // Gestisce sia data.data che data direttamente
+-      
+-      if (apiData && apiData.companyDetails) {
+-        // L'indirizzo è SEPARATO da companyDetails nella risposta API
+-        const address = apiData.address;
+-        const fullAddress = address ? 
+-          `${address.streetName || ''}, ${address.zipCode || ''} ${address.town || ''} (${address.province?.code || ''})`
+-          : '';
+-
+-        const mappedData: Partial<WizardData> = {
+-          ragione_sociale: apiData.companyDetails.companyName || '',
+-          partita_iva_impresa: apiData.companyDetails.vatCode || normalizedVat,
+-          codice_fiscale_impresa: apiData.companyDetails.taxCode || '',
+-          indirizzo: fullAddress.trim(),
+-          paese: address?.country?.code || 'IT',
+-        };
+-
+-        updateFormData(mappedData);
+-        setApiDataLoaded(true);
+-        addDebugLog('✅ Dati mappati nel form', mappedData);
+-      } else {
++    // Mapping dei dati dall'API a formData (SOLO PER IMPRESE)
++    const apiData = data.data || data;
++    
++    if (apiData && apiData.companyDetails) {
++      const company = apiData.companyDetails;
++      const address = apiData.address;
++      const managers = apiData.managers || [];
++      const shareholders = apiData.shareholders || [];
++      
++      // Costruisce indirizzo completo
++      const fullAddress = address ? 
++        `${address.streetName || ''}, ${address.zipCode || ''} ${address.town || ''} (${address.province?.code || ''})`
++        : '';
++
++      // Ottieni rappresentante legale (solo nome, campo manuale)
++      const legalRep = getLegalRepresentative(managers);
++      const legalRepName = legalRep ? `${legalRep.name || ''} ${legalRep.surname || ''}`.trim() : '';
++
++      // Ottieni titolari effettivi
++      const beneficialOwners = getBeneficialOwners(shareholders, managers);
++
++      const mappedData: Partial<WizardData> = {
++        ragione_sociale: company.companyName || '',
++        partita_iva_impresa: company.vatCode || normalizedVat,
++        codice_fiscale_impresa: company.taxCode || '',
++        indirizzo: fullAddress.trim(),
++        paese: address?.country?.code || 'IT',
++        rappresentante_legale: legalRepName, // Campo manuale, può essere modificato
++        titolari_effettivi: beneficialOwners
++      };
++
++      updateFormData(mappedData);
++      setApiDataLoaded(true);
++      addDebugLog('✅ Dati mappati nel form', { ...mappedData, titolari: beneficialOwners.length });
++    } else {
+         addDebugLog('⚠️ Struttura dati API non riconosciuta', data);
+         addDebugLog('🔍 Struttura ricevuta', { 
+           hasData: !!data.data, 
+@@ -396,18 +473,6 @@ export function ClienteWizard({ onComplete, onCancel }: ClienteWizardProps) {
+       if (!formData.documento_rappresentante?.data_scadenza) {
+         return { valid: false, message: 'Data Scadenza Documento Rappresentante è obbligatoria' };
+       }
+-      // Validazione Titolare Effettivo Base
+-      if (!formData.titolare_effettivo_base?.nome?.trim()) {
+-        return { valid: false, message: 'Nome Completo Titolare Effettivo è obbligatorio' };
+-      }
+-      if (!formData.titolare_effettivo_base?.codice_fiscale?.trim()) {
+-        return { valid: false, message: 'Codice Fiscale Titolare Effettivo è obbligatorio' };
+-      }
+-      if (!formData.titolare_effettivo_base?.data_nascita) {
+-        return { valid: false, message: 'Data di Nascita Titolare Effettivo è obbligatoria' };
+-      }
+-      if (!formData.titolare_effettivo_base?.metodo_verifica) {
+-        return { valid: false, message: 'Metodo di Verifica Titolare Effettivo è obbligatorio' };
+-      }
+     }
+ 
+     // PROFESSIONISTA
+@@ -519,18 +584,6 @@ export function ClienteWizard({ onComplete, onCancel }: ClienteWizardProps) {
+           data_scadenza: formData.documento_rappresentante.data_scadenza
+         } : null,
+         pep: formData.pep_impresa || false,
+-        sanzioni: formData.sanzioni_impresa || false,
+-        // Titolare Effettivo Base
+-        titolare_effettivo: formData.titolare_effettivo_base ? {
+-          nome: formData.titolare_effettivo_base.nome,
+-          codice_fiscale: formData.titolare_effettivo_base.codice_fiscale,
+-          data_nascita: formData.titolare_effettivo_base.data_nascita,
+-          metodo_verifica: formData.titolare_effettivo_base.metodo_verifica,
+-          note: formData.titolare_effettivo_base.note
+-        } : null
++        sanzioni: formData.sanzioni_impresa || false
+       };
+     }
+ 
+@@ -1236,79 +1289,6 @@ export function ClienteWizard({ onComplete, onCancel }: ClienteWizardProps) {
+               </label>
+             </div>
+ 
+-            {/* Titolare Effettivo Base */}
+-            <div className="border-t pt-4">
+-              <h4 className="font-semibold mb-3 flex items-center gap-2">
+-                <User className="w-5 h-5 text-blue-600" />
+-                Titolare Effettivo
+-              </h4>
+-              
+-              <div className="space-y-4">
+-                <div>
+-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+-                    Nome Completo *
+-                  </label>
+-                  <input
+-                    type="text"
+-                    value={formData.titolare_effettivo_base?.nome || ''}
+-                    onChange={(e) => updateFormData({
+-                      titolare_effettivo_base: {
+-                        ...formData.titolare_effettivo_base!,
+-                        nome: e.target.value
+-                      }
+-                    })}
+-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+-                    placeholder="Nome e cognome del titolare effettivo"
+-                  />
+-                </div>
+-
+-                <div className="grid grid-cols-2 gap-4">
+-                  <div>
+-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+-                      Codice Fiscale *
+-                    </label>
+-                    <input
+-                      type="text"
+-                      value={formData.titolare_effettivo_base?.codice_fiscale || ''}
+-                      onChange={(e) => updateFormData({
+-                        titolare_effettivo_base: {
+-                          ...formData.titolare_effettivo_base!,
+-                          codice_fiscale: e.target.value
+-                        }
+-                      })}
+-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+-                    />
+-                  </div>
+-
+-                  <div>
+-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+-                      Data di Nascita *
+-                    </label>
+-                    <input
+-                      type="date"
+-                      value={formData.titolare_effettivo_base?.data_nascita || ''}
+-                      onChange={(e) => updateFormData({
+-                        titolare_effettivo_base: {
+-                          ...formData.titolare_effettivo_base!,
+-                          data_nascita: e.target.value
+-                        }
+-                      })}
+-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+-                    />
+-                  </div>
+-                </div>
+-
+-                <div>
+-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+-                    Metodo di Verifica *
+-                  </label>
+-                  <select
+-                    value={formData.titolare_effettivo_base?.metodo_verifica || ''}
+-                    onChange={(e) => updateFormData({
+-                      titolare_effettivo_base: {
+-                        ...formData.titolare_effettivo_base!,
+-                        metodo_verifica: e.target.value
+-                      }
+-                    })}
+-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+-                  >
+-                    <option value="">Seleziona metodo...</option>
+-                    <option value="documentale">Verifica Documentale</option>
+-                    <option value="banche_dati">Consultazione Banche Dati</option>
+-                    <option value="visura_camerale">Visura Camerale</option>
+-                    <option value="altro">Altro</option>
+-                  </select>
+-                </div>
+-
+-                <div>
+-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+-                    Note (opzionale)
+-                  </label>
+-                  <textarea
+-                    value={formData.titolare_effettivo_base?.note || ''}
+-                    onChange={(e) => updateFormData({
+-                      titolare_effettivo_base: {
+-                        ...formData.titolare_effettivo_base!,
+-                        note: e.target.value
+-                      }
+-                    })}
+-                    rows={3}
+-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+-                    placeholder="Eventuali note aggiuntive..."
+-                  />
+-                </div>
+-              </div>
+-            </div>
+           </div>
+         )}
+ 
