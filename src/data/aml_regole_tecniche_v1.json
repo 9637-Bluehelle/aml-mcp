@@ -1,0 +1,616 @@
+{
+  "meta": {
+    "spec": "CNDCEC-RegoleTecniche-2025-extended",
+    "version": "1.2.0",
+    "last_updated": "2026-04-03T00:00:00.000000",
+    "jurisdiction": "IT",
+    "source_note": "Sintesi operativa strutturata per piattaforme AML basata sulle Regole Tecniche 2025 del CNDCEC, sulle Indicazioni Operative CNDCEC Marzo 2026 e sul D.Lgs. 231/2007. Verificare sempre il testo ufficiale.",
+    "scoring_scale": {
+      "min": 1,
+      "max": 4,
+      "classes": [
+        {
+          "from": 1.0,
+          "to": 1.5,
+          "label": "Non significativo",
+          "grade": 1
+        },
+        {
+          "from": 1.6,
+          "to": 2.5,
+          "label": "Poco significativo",
+          "grade": 2
+        },
+        {
+          "from": 2.6,
+          "to": 3.5,
+          "label": "Abbastanza significativo",
+          "grade": 3
+        },
+        {
+          "from": 3.6,
+          "to": 4.0,
+          "label": "Molto significativo",
+          "grade": 4
+        }
+      ]
+    }
+  },
+  "prestazioni_catalog": [
+    {
+      "id": "collegio-sindacale-no-revisione",
+      "label": "Collegio sindacale senza revisione",
+      "inherentRisk": 1,
+      "onlyTabA": true
+    },
+    {
+      "id": "visto-conformita",
+      "label": "Apposizione del visto di conformità su dichiarazioni fiscali",
+      "inherentRisk": 1
+    },
+    {
+      "id": "predisposizione-interpelli",
+      "label": "Predisposizione di interpelli con richiesta di chiarimenti interpretativi",
+      "inherentRisk": 1
+    },
+    {
+      "id": "risposte-quesiti",
+      "label": "Risposte a quesiti di carattere fiscale e societario",
+      "inherentRisk": 1
+    },
+    {
+      "id": "consulente-tecnico",
+      "label": "Consulente tecnico di parte",
+      "inherentRisk": 1
+    },
+    {
+      "id": "assistenza-innanzi-autorita",
+      "label": "Funzioni di assistenza, difesa e rappresentanza innanzi ad una Autorità Giudiziale",
+      "inherentRisk": 1
+    },
+    {
+      "id": "funzioni-mediazione",
+      "label": "Funzioni di mediazione e arbitrato",
+      "inherentRisk": 1
+    },
+    {
+      "id": "incarichi-giurisdizionali",
+      "label": "Incarichi che derivano da nomine giurisdizionali",
+      "inherentRisk": 1
+    },
+    {
+      "id": "gestore-della-crisi",
+      "label": "Incarichi di gestore della crisi e di esperto indipendente nell’ambito della composizione della crisi",
+      "inherentRisk": 1
+    },
+    {
+      "id": "formazione-editoria",
+      "label": "Incarichi professionali nel settore della formazione e dell’editoria",
+      "inherentRisk": 1
+    },
+    {
+      "id": "odv",
+      "label": "Componente di organismo di vigilanza ex d.lgs.231/2001 (OdV)",
+      "inherentRisk": 1
+    },
+    {
+      "id": "pratiche-telematiche",
+      "label": "Predisposizione e/o invio telematico di pratiche varie agli uffici pubblici competenti",
+      "inherentRisk": 1
+    },
+    {
+      "id": "pratiche-diritti",
+      "label": "Predisposizione presso gli uffici pubblici competenti di pratiche di prima iscrizione e rinnovo per la tutela di diritti",
+      "inherentRisk": 1
+    },
+    {
+      "id": "assitenza-tecnica-pa",
+      "label": "Attività di assistenza tecnica e consulenza specialistica alla programmazione, gestione, attuazione, rendicontazione, monitoraggio, controllo, valutazione e supporto alla certificazione di risorse pubbliche, anche europee, nonché per l’esercizio e lo sviluppo della Funzione di Sorveglianza e Audit dei Programmi",
+      "inherentRisk": 1
+    },
+    {
+      "id": "amministrazione-societa",
+      "label": "Amministrazione e liquidazione di società, enti, aziende, patrimoni, singoli beni (incarichi di nomina non giudiziale)",
+      "inherentRisk": 2
+    },
+    {
+      "id": "consulenza-tributaria",
+      "label": "Consulenza in materia tributaria",
+      "inherentRisk": 2
+    },
+    {
+      "id": "consulenza-contrattuale",
+      "label": "Consulenza contrattuale",
+      "inherentRisk": 2
+    },
+    {
+      "id": "amministrazione-liquidazione-non-giudiziale",
+      "label": "Amministrazione/Liquidazione (nomina non giudiziale)",
+      "inherentRisk": 2
+    },
+    {
+      "id": "custodia-beni-non-giudiziale",
+      "label": "Custodia e conservazione di beni e aziende (incarichi di nomina non giudiziale)",
+      "inherentRisk": 2
+    },
+    {
+      "id": "valutazioni-varie",
+      "label": "Valutazione di quote sociali, aziende, rami d'azienda, patrimoni, singoli beni e diritti (non rientranti in incarichi di CTP)",
+      "inherentRisk": 2
+    },
+    {
+      "id": "amministrazione-trust",
+      "label": "Amministrazione di trust o istituti giuridici affini",
+      "inherentRisk": 3
+    },
+    {
+      "id": "assistenza-aziendale-continuativa",
+      "label": "Assistenza e consulenza aziendale e societaria continuativa e generica",
+      "inherentRisk": 3,
+      "onlyTabA": true
+    },
+    {
+      "id": "asseverazione-business-plan",
+      "label": "Attività di valutazione tecnica dell'iniziativa di impresa e di asseverazione dei business plan per l'accesso a finanziamenti pubblici",
+      "inherentRisk": 3
+    },
+    {
+      "id": "consulenza-economico-finanziaria",
+      "label": "Consulenza economico-finanziaria-patrimoniale",
+      "inherentRisk": 3
+    },
+    {
+      "id": "costituzione-enti-trust",
+      "label": "Costituzione di enti / trust / strutture analoghe",
+      "inherentRisk": 3
+    },
+    {
+      "id": "tenuta-contabilita",
+      "label": "Tenuta della contabilità",
+      "inherentRisk": 3,
+      "onlyTabA": true
+    },
+    {
+      "id": "consulenza-bilancio",
+      "label": "Consulenza in materia di redazione del bilancio",
+      "inherentRisk": 3,
+      "onlyTabA": true
+    },
+    {
+      "id": "revisione-legale",
+      "label": "Revisione legale dei conti",
+      "inherentRisk": 3,
+      "onlyTabA": true
+    },
+    {
+      "id": "finanza-straordinaria",
+      "label": "Consulenza in operazioni di finanza straordinaria",
+      "inherentRisk": 4
+    }
+  ],
+  "fattori_rischio": {
+    "tabella_a": [
+      {
+        "id": "naturaGiuridica",
+        "label": "A.1 - Natura giuridica",
+        "descrizione": "Natura giuridica del cliente",
+        "fattori": [
+          { "id": "a1_non_congruita", "label": "Non congruità della natura giuridica rispetto all'attività/dimensioni" },
+          { "id": "a1_articolazione_opaca", "label": "Articolazione giuridica complessa o opaca per ostacolare l'identificazione del titolare effettivo" },
+          { "id": "a1_ppe", "label": "Partecipazione di Persone Politicamente Esposte (PPE)" },
+          { "id": "a1_ong_paesi_rischio", "label": "Incarichi in ONG/associazioni in paesi a rischio" },
+          { "id": "a1_processi_penali", "label": "Processi penali, misure di prevenzione, legami con soggetti legati a terrorismo o riciclaggio" }
+        ]
+      },
+      {
+        "id": "attivitaPrevalente",
+        "label": "A.2 - Prevalente attività svolta",
+        "descrizione": "Attività prevalente svolta dal cliente",
+        "fattori": [
+          { "id": "a2_infiltrazioni", "label": "Attività esposte al rischio di infiltrazioni criminali/terroristiche" },
+          { "id": "a2_struttura_non_coerente", "label": "Struttura organizzativa/dimensionale non coerente con l'attività" },
+          { "id": "a2_non_conformita", "label": "Non conformità dell'attività rispetto all'atto costitutivo" }
+        ]
+      },
+      {
+        "id": "comportamentoConferimento",
+        "label": "A.3 - Comportamento tenuto al conferimento dell'incarico",
+        "descrizione": "Comportamento tenuto dal cliente al momento del conferimento dell'incarico",
+        "fattori": [
+          { "id": "a3_non_presente", "label": "Cliente non presente fisicamente" },
+          { "id": "a3_terzi_non_definiti", "label": "Presenza di soggetti terzi con ruolo non definito" },
+          { "id": "a3_non_trasparente", "label": "Comportamento non trasparente e collaborativo" },
+          { "id": "a3_difficolta_te", "label": "Difficoltà nell'individuazione del titolare effettivo" }
+        ]
+      },
+      {
+        "id": "areaClienteControparte",
+        "label": "A.4 - Area geografica di residenza del cliente",
+        "descrizione": "Area geografica di residenza o sede del cliente e delle controparti",
+        "fattori": [
+          { "id": "a4_comune_rischio_contante", "label": "Residenza in Comune italiano a rischio per uso eccessivo di contante" },
+          { "id": "a4_paesi_alto_rischio", "label": "Paesi terzi ad alto rischio o non collaborativi con il GAFI" },
+          { "id": "a4_corruzione", "label": "Paesi con elevata corruzione" },
+          { "id": "a4_conflitto_sanzioni", "label": "Aree di conflitto/terrorismo o soggette a sanzioni/embargo ONU" },
+          { "id": "a4_lontananza", "label": "Lontananza della residenza rispetto alla sede del Professionista" }
+        ]
+      }
+    ],
+    "tabella_b": [
+      {
+        "id": "tipologia",
+        "label": "B.1 - Tipologia",
+        "descrizione": "Tipologia dell'operazione o della prestazione professionale",
+        "fattori": [
+          { "id": "b1_ordinaria_straordinaria", "label": "Operazione ordinaria/straordinaria rispetto al profilo" },
+          { "id": "b1_schemi_opacita", "label": "Schemi negoziali che agevolano l'opacità" },
+          { "id": "b1_articolazione_ingiustificata", "label": "Articolazione contrattuale ingiustificata" }
+        ]
+      },
+      {
+        "id": "modalita",
+        "label": "B.2 - Modalità di svolgimento",
+        "descrizione": "Modalità di svolgimento dell'operazione",
+        "fattori": [
+          { "id": "b2_pagamenti_non_tracciati", "label": "Utilizzo di mezzi di pagamento non tracciati o valute virtuali" },
+          { "id": "b2_conti_non_propri", "label": "Utilizzo di conti non propri" },
+          { "id": "b2_procure_reiterate", "label": "Ricorso reiterato a procure" },
+          { "id": "b2_domiciliazioni_comodo", "label": "Domiciliazioni di comodo" }
+        ]
+      },
+      {
+        "id": "ammontare",
+        "label": "B.3 - Ammontare dell'operazione",
+        "descrizione": "Ammontare dell'operazione",
+        "fattori": [
+          { "id": "b3_incoerenza_ammontare", "label": "Incoerenza dell'ammontare rispetto al profilo del cliente" },
+          { "id": "b3_frazionamenti", "label": "Presenza di frazionamenti artificiosi" }
+        ]
+      },
+      {
+        "id": "frequenzaVolumeDurata",
+        "label": "B.4 - Frequenza e volume / durata prestazione",
+        "descrizione": "Frequenza, volume delle operazioni e durata della prestazione professionale",
+        "fattori": [
+          { "id": "b4_non_congruita_frequenza", "label": "Non congruità della frequenza rispetto all'attività" },
+          { "id": "b4_operativita_improvvisa", "label": "Operatività improvvisa" },
+          { "id": "b4_ammontare_consistente", "label": "Operazioni di ammontare consistente in un ristretto arco temporale" },
+          { "id": "b4_continuativo_occasionale", "label": "Rapporto continuativo o occasionale" }
+        ]
+      },
+      {
+        "id": "ragionevolezza",
+        "label": "B.5 - Ragionevolezza",
+        "descrizione": "Ragionevolezza dell'operazione o della prestazione professionale",
+        "fattori": [
+          { "id": "b5_irragionevolezza_attivita", "label": "Irragionevolezza rispetto all'attività svolta" },
+          { "id": "b5_irragionevolezza_risorse", "label": "Irragionevolezza rispetto alle risorse economiche" },
+          { "id": "b5_non_congruita_finalita", "label": "Non congruità rispetto alle finalità dichiarate" }
+        ]
+      },
+      {
+        "id": "areaDestinazione",
+        "label": "B.6 - Area geografica di destinazione",
+        "descrizione": "Area geografica di destinazione dell'operazione",
+        "fattori": [
+          { "id": "b6_comune_rischio", "label": "Destinazione in Comune italiano a rischio contante o Paesi terzi ad alto rischio/sanzionati" },
+          { "id": "b6_no_riferimenti", "label": "Inesistenza di riferimenti tradizionali nell'area (es. Camere di Commercio)" },
+          { "id": "b6_irragionevolezza_aree", "label": "Irragionevolezza della ricerca di interazione con altre aree" }
+        ]
+      }
+    ]
+  },
+  "regole_tecniche": [
+    {
+      "id": "RT1",
+      "titolo": "Autovalutazione del rischio",
+      "ambito": "Autovalutazione",
+      "normativa": [
+        "D.Lgs. 231/2007 artt. 15, 16 e 16-ter (valutazione del rischio e proliferazione armi di distruzione di massa)",
+        "Regole Tecniche CNDCEC 2025 – RT1 (Autovalutazione)",
+        "Indicazioni Operative CNDCEC Marzo 2026 – Modulistica AV.0"
+      ],
+      "frequenza_minima": "Entro un anno dalla pubblicazione dell'Analisi nazionale dei rischi del CSF",
+      "aggiornare_anche_se": [
+        "Variazioni rilevanti in clientela/servizi/canali/aree",
+        "Modifiche normative o linee guida UIF/MEF",
+        "Cambi nell'assetto organizzativo",
+        "Pubblicazione aggiornamento Analisi nazionale dei rischi del CSF (riciclaggio/FDT/proliferazione)"
+      ],
+      "calcoli": {
+        "inerente": {
+          "metrica": "media",
+          "fattori": [
+            "clientTypes",
+            "geography",
+            "channels",
+            "services"
+          ]
+        },
+        "vulnerabilita": {
+          "metrica": "media",
+          "fattori": [
+            "training",
+            "kycOrg",
+            "retentionOrg",
+            "sosCashControls"
+          ]
+        },
+        "residuo": {
+          "formula": "0.4*inerente + 0.6*vulnerabilita"
+        }
+      },
+      "obblighi": [
+        "Approvare e firmare il documento di autovalutazione",
+        "Definire presidi proporzionati e piano di mitigazione",
+        "Conservare evidenze e versioni precedenti",
+        "Rendere disponibili i risultati agli addetti",
+        "Valutare il rischio di riciclaggio, finanziamento del terrorismo e proliferazione delle armi di distruzione di massa (art. 16-ter)"
+      ],
+      "evidenze_minime": [
+        "Documento autovalutazione (versione, data, autore)",
+        "Matrice fattori/rating, criteri e pesi",
+        "Piano azioni correttive"
+      ],
+      "alert": [
+        {
+          "id": "RT1-A1",
+          "condizione": "giorni_alla_scadenza(1095) <= 60",
+          "messaggio": "Autovalutazione in scadenza entro 60 giorni"
+        },
+        {
+          "id": "RT1-A2",
+          "condizione": "evento=nuovo_servizio OR variazione_clientela_significativa",
+          "messaggio": "Verifica se aggiornare l'autovalutazione"
+        },
+        {
+          "id": "RT1-A3",
+          "condizione": "data_corrente <= 2026-05-27",
+          "messaggio": "Scadenza 27 maggio 2026: aggiornare l'autovalutazione del rischio includendo la valutazione del rischio di proliferazione delle armi di distruzione di massa (art. 16-ter D.Lgs. 231/2007)"
+        }
+      ],
+      "ui": {
+        "tabs": [
+          "Autovalutazione"
+        ],
+        "badges": [
+          "inerente",
+          "vulnerabilita",
+          "residuo"
+        ],
+        "soglie": "meta.scoring_scale.classes"
+      }
+    },
+    {
+      "id": "RT2",
+      "titolo": "Adeguata verifica della clientela (KYC)",
+      "ambito": "Adeguata Verifica",
+      "normativa": [
+        "D.Lgs. 231/2007 art. 17 (obblighi generali)",
+        "D.Lgs. 231/2007 art. 18-22 (elementi dell'adeguata verifica, controllo costante, PEP)",
+        "D.Lgs. 231/2007 art. 23 (astensione)",
+        "Regole Tecniche CNDCEC 2025 – RT2 (Adeguata Verifica)"
+      ],
+      "principi": [
+        "Approccio basato sul rischio",
+        "Identificazione e verifica dell'identità",
+        "Individuazione titolare effettivo",
+        "Acquisizione di scopo e natura del rapporto",
+        "Controllo costante proporzionato"
+      ],
+      "calcoli": {
+        "rischio_inerente_prestazione": {
+          "fonte": "prestazioni_catalog[*].inherentRisk",
+          "classe": 1
+        },
+        "rischio_specifico": {
+          "tabelle": {
+            "A": {
+              "voci": 4,
+              "fattori": [
+                "naturaGiuridica",
+                "attivitaPrevalente",
+                "comportamentoConferimento",
+                "areaClienteControparte"
+              ],
+              "peso": 1
+            },
+            "B": {
+              "voci": 6,
+              "fattori": [
+                "tipologia",
+                "modalita",
+                "ammontare",
+                "frequenzaVolumeDurata",
+                "ragionevolezza",
+                "areaDestinazione"
+              ],
+              "peso": 1
+            }
+          },
+          "eccezioni_onlyTabA": [
+            "tenuta-contabilita",
+            "consulenza-bilancio",
+            "revisione-legale",
+            "assistenza-aziendale-continuativa"
+          ],
+          "metrica": "media_su_10_o_4"
+        },
+        "rischio_effettivo": {
+          "formula": "0.3*inerente_prestazione + 0.7*rischio_specifico"
+        }
+      },
+      "misure_per_classe": [
+        {
+          "grade": 1,
+          "label": "Regole di condotta / Semplificate minime",
+          "checklist": [
+            "Acquisire e conservare copia del mandato/lettera d'incarico",
+            "Identificazione light (documento, coerenza, assenza anomalie)",
+            "Valutare esenzioni ove previste dalle RT"
+          ]
+        },
+        {
+          "grade": 2,
+          "label": "Semplificate",
+          "checklist": [
+            "Documento d'identità cliente/rappresentante",
+            "Dichiarazione titolare effettivo + riscontro con fonte affidabile",
+            "Scopo e natura dell'incarico (breve descrizione)",
+            "Controllo costante con revisione 24–36 mesi"
+          ]
+        },
+        {
+          "grade": 3,
+          "label": "Ordinarie",
+          "checklist": [
+            "Identificazione completa cliente e rappresentanti",
+            "Verifica titolare effettivo (es. visura/registro)",
+            "Scopo e natura dettagliati; coerenza economica",
+            "Controlli PEP/sanzioni; monitoraggio periodico"
+          ]
+        },
+        {
+          "grade": 4,
+          "label": "Rafforzate",
+          "checklist": [
+            "Fonti aggiuntive indipendenti; approfondimenti provenienza fondi",
+            "Autorizzazione interna del referente AML per assunzione/continuazione",
+            "Maggiore frequenza del controllo costante",
+            "Valutare astensione e/o SOS"
+          ]
+        }
+      ],
+      "regole_di_condotta": {
+        "applicabili_a_prestazioni_grade1": true,
+        "esempi": [
+          "Obblighi minimi documentali (mandato, minima identificazione)",
+          "Nessuna Tabella B; valutazione anomalie su base evento"
+        ]
+      },
+      "evidenze_minime": [
+        "Documento di identità (cliente/rappresentante)",
+        "Dichiarazione titolare effettivo + riscontro",
+        "Scopo e natura dell'incarico",
+        "Valutazione del rischio (inerente, specifico, effettivo)",
+        "Esito controlli PEP/sanzioni (se applicabile)",
+        "Decisione misure (semplificate/ordinarie/rafforzate)"
+      ],
+      "alert": [
+        {
+          "id": "RT2-A1",
+          "condizione": "classe_rischio>=4",
+          "messaggio": "Valuta misure rafforzate o astensione"
+        },
+        {
+          "id": "RT2-A2",
+          "condizione": "cliente.PEP==true",
+          "messaggio": "Cliente PEP: applica misure rafforzate"
+        },
+        {
+          "id": "RT2-A3",
+          "condizione": "rischio_specifico_delta>=0.5",
+          "messaggio": "Variazione significativa del rischio specifico"
+        }
+      ]
+    },
+    {
+      "id": "RT3",
+      "titolo": "Conservazione e ricostruibilità",
+      "ambito": "Conservazione",
+      "normativa": [
+        "D.Lgs. 231/2007 art. 31-36 (obblighi di conservazione)",
+        "Regole Tecniche CNDCEC 2025 – RT3 (Conservazione)"
+      ],
+      "opzioni_conservazione": [
+        "cartacea",
+        "informatica",
+        "mista"
+      ],
+      "requisiti": [
+        "Integrità, leggibilità, reperibilità nel tempo",
+        "Indicazione di chi alimenta e chi accede al sistema",
+        "Ricostruibilità univoca delle operazioni",
+        "Tracciamento (audit log) degli accessi e modifiche"
+      ],
+      "dati_minimi_fascicolo": [
+        "Dati identificativi cliente/rappresentante",
+        "Titolare effettivo e metodo di verifica",
+        "Scopo e natura dell'incarico",
+        "Documenti acquisiti (tipologia, data, fonte)",
+        "Valutazioni e classe di rischio",
+        "Misure adottate e controlli effettuati",
+        "Date di aggiornamento/monitoraggio"
+      ],
+      "alert": [
+        {
+          "id": "RT3-A1",
+          "condizione": "documento_scaduto==true",
+          "messaggio": "Documento d'identità scaduto"
+        },
+        {
+          "id": "RT3-A2",
+          "condizione": "assenza_evidenze_minime==true",
+          "messaggio": "Fascicolo incompleto"
+        }
+      ],
+      "ui": {
+        "esportazioni": [
+          "json",
+          "pdf"
+        ],
+        "campi_obbligatori_highlight": true
+      }
+    },
+    {
+      "id": "RT4",
+      "titolo": "Controllo costante, astensione e SOS",
+      "ambito": "Monitoraggio & Segnalazioni",
+      "normativa": [
+        "D.Lgs. 231/2007 art. 19 (controllo costante)",
+        "D.Lgs. 231/2007 art. 23 (astensione)",
+        "D.Lgs. 231/2007 art. 35 (segnalazione di operazioni sospette - SOS)",
+        "Regole Tecniche CNDCEC 2025 – RT4 (Controllo costante/Astensione/SOS)",
+        "Linee guida UIF su SOS (ultime aggior.)"
+      ],
+      "principi": [
+        "Controllo costante proporzionato al rischio",
+        "Astensione in caso di impossibilità di eseguire l'adeguata verifica",
+        "Obbligo di valutazione e invio SOS ove ricorrano i presupposti"
+      ],
+      "frequenza_controllo_costante": {
+        "grade2": "24-36 mesi",
+        "grade3": "12-24 mesi",
+        "grade4": "6-12 mesi"
+      },
+      "trigger_astensione": [
+        "Persistente impossibilità di identificare/verificare cliente o titolare effettivo",
+        "Rifiuto di fornire informazioni essenziali",
+        "Sospetto di finalità di riciclaggio/FT incompatibili con la prosecuzione"
+      ],
+      "trigger_SOS": [
+        "Operazioni incoerenti con profilo economico",
+        "Strutturazione importi/durate per eludere obblighi",
+        "Coinvolgimento paesi ad alto rischio/sanzionati",
+        "Informazioni interne o esterne che generano sospetto ragionevole"
+      ],
+      "evidenze_minime": [
+        "Registro controlli costanti con esito e data",
+        "Motivazione decisioni di astensione",
+        "Dossier di valutazione SOS (segnalazione/archiviazione)"
+      ],
+      "alert": [
+        {
+          "id": "RT4-A1",
+          "condizione": "scadenza_controllo_costante_prossima==true",
+          "messaggio": "Controllo costante in scadenza"
+        },
+        {
+          "id": "RT4-A2",
+          "condizione": "anomalie_multiple>=2",
+          "messaggio": "Più anomalie rilevate: valutare SOS"
+        }
+      ]
+    }
+  ]
+}

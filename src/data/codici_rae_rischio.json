@@ -1,0 +1,209 @@
+{
+  "metadata": {
+    "descrizione": "Codici RAE (Ramo di Attivita Economica - Banca d'Italia) con indice indicativo del rischio di riciclaggio e uso eccessivo di contante",
+    "versione_rae": "Classificazione RAE Banca d'Italia (23 branche principali)",
+    "data_generazione": "2026-04-14",
+    "totale_codici": 23,
+    "livelli_rischio": [
+      "1 - Non significativo",
+      "2 - Poco significativo",
+      "3 - Abbastanza significativo",
+      "4 - Molto significativo"
+    ],
+    "fonti": [
+      "Banca d'Italia - Classificazione RAE (Ramo di Attivita Economica) utilizzata nelle segnalazioni statistiche e di vigilanza",
+      "Transcrime/IARM - Universita Cattolica del Sacro Cuore: 'Il rischio riciclaggio in Italia' - Indice composito di rischio",
+      "Banca d'Italia - Direttiva 30 luglio 2019: settori ad alto rischio per adeguata verifica rafforzata",
+      "UIF (Unita di Informazione Finanziaria, Banca d'Italia) - Indicatori di anomalia (provvedimento 12 maggio 2023) e Rapporto Annuale",
+      "D.Lgs. 231/2007 (normativa antiriciclaggio italiana) - Fattori di rischio",
+      "EU Supranational Risk Assessment (SNRA) - Valutazione rischio sovranazionale"
+    ],
+    "note": "ATTENZIONE: (1) La classificazione RAE di Banca d'Italia e strutturata per MACRO-BRANCHE (i 23 rami principali elencati in questo file), con granularita molto piu bassa rispetto ai codici ATECO. Per sottocategorie piu fini occorre fare riferimento alle tabelle ufficiali Banca d'Italia o derivare dall'ATECO tramite la tabella di corrispondenza RAE-ATECO pubblicata da BdI. (2) Il valore rischio_indicativo NON e una classificazione ufficiale: e stato derivato per analogia dai settori ATECO corrispondenti e incrociando le fonti istituzionali (Transcrime IARM, Banca d'Italia, UIF, EU SNRA). Va usato come punto di partenza nella valutazione del rischio. La valutazione definitiva deve considerare tutti i fattori previsti dal D.Lgs. 231/2007 e dalle Regole Tecniche CNDCEC (attivita, area geografica, natura giuridica, comportamento, tipo di operazione, importo, durata). (3) Il campo alto_rischio_banca_italia indica i rami che includono settori esplicitamente elencati nella direttiva Banca d'Italia del 30/07/2019 per adeguata verifica rafforzata. (4) Si raccomanda di VERIFICARE le denominazioni ufficiali dei codici RAE con la tabella pubblicata da Banca d'Italia prima dell'uso in produzione."
+  },
+  "codici": [
+    {
+      "codice": "001",
+      "attivita": "Prodotti dell'agricoltura, silvicoltura e pesca",
+      "rischio_indicativo": 1,
+      "rischio_indicativo_label": "non significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Settore primario, bassa intensita di contante nelle transazioni B2B prevalenti; attenzione a vendita diretta al consumatore in contanti"
+    },
+    {
+      "codice": "020",
+      "attivita": "Prodotti energetici",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Settore regolamentato con transazioni prevalentemente tracciate; rischio medio-basso"
+    },
+    {
+      "codice": "040",
+      "attivita": "Minerali e metalli ferrosi e non ferrosi",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Commercio B2B tracciato; attenzione a commercio di metalli preziosi (oro/argento) che rientra in altra classificazione ad alto rischio"
+    },
+    {
+      "codice": "060",
+      "attivita": "Minerali e prodotti a base di minerali non metallici",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Produzione industriale con transazioni B2B; rischio medio-basso"
+    },
+    {
+      "codice": "080",
+      "attivita": "Prodotti chimici",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Settore industriale regolamentato; transazioni prevalentemente B2B tracciate"
+    },
+    {
+      "codice": "100",
+      "attivita": "Prodotti in metallo, escluse le macchine e i mezzi di trasporto",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Manifattura B2B; rischio medio-basso"
+    },
+    {
+      "codice": "120",
+      "attivita": "Macchine agricole e industriali",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Vendita di beni strumentali B2B con transazioni tracciate"
+    },
+    {
+      "codice": "140",
+      "attivita": "Macchine per ufficio, elaborazione dati, strumenti di precisione e similari",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Commercio B2B di beni tecnologici; rischio medio-basso"
+    },
+    {
+      "codice": "160",
+      "attivita": "Materiale e forniture elettriche",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Manifattura e commercio B2B con transazioni tracciate"
+    },
+    {
+      "codice": "180",
+      "attivita": "Mezzi di trasporto",
+      "rischio_indicativo": 3,
+      "rischio_indicativo_label": "abbastanza significativo",
+      "alto_rischio_banca_italia": true,
+      "fonte_rischio": "Banca d'Italia (direttiva 30/07/2019): commercio di autoveicoli (in particolare usato) identificato come settore ad alto rischio per uso intensivo di contante e frequenti operazioni sospette (UIF)"
+    },
+    {
+      "codice": "200",
+      "attivita": "Prodotti alimentari, bevande e prodotti a base di tabacco",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Produzione alimentare prevalentemente B2B; rischio maggiore nella distribuzione al dettaglio con alta intensita di contante (ricompreso in RAE 320)"
+    },
+    {
+      "codice": "220",
+      "attivita": "Prodotti tessili, cuoio e calzature, abbigliamento",
+      "rischio_indicativo": 3,
+      "rischio_indicativo_label": "abbastanza significativo",
+      "alto_rischio_banca_italia": true,
+      "fonte_rischio": "Transcrime/IARM e UIF: settore tessile/moda/pelletteria con presenza di flussi di contante, filiera complessa e rischio di fatturazione fittizia/sotto-fatturazione"
+    },
+    {
+      "codice": "240",
+      "attivita": "Carta, articoli di carta, prodotti della stampa ed editoria",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Manifattura e servizi editoriali prevalentemente B2B; rischio medio-basso"
+    },
+    {
+      "codice": "260",
+      "attivita": "Prodotti in gomma e plastica",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Manifattura B2B tracciata; rischio medio-basso"
+    },
+    {
+      "codice": "280",
+      "attivita": "Altri prodotti industriali",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Aggregato eterogeneo di attivita manifatturiere; valutare caso per caso in funzione dell'attivita specifica"
+    },
+    {
+      "codice": "300",
+      "attivita": "Edilizia e opere pubbliche",
+      "rischio_indicativo": 4,
+      "rischio_indicativo_label": "molto significativo",
+      "alto_rischio_banca_italia": true,
+      "fonte_rischio": "Banca d'Italia (direttiva 30/07/2019) e UIF: edilizia e appalti pubblici sono tra i settori a piu alto rischio di riciclaggio per elevato uso di contante, subappalti opachi, frammentazione della filiera e rischio infiltrazione criminalita organizzata"
+    },
+    {
+      "codice": "320",
+      "attivita": "Servizi del commercio, recuperi e riparazioni",
+      "rischio_indicativo": 3,
+      "rischio_indicativo_label": "abbastanza significativo",
+      "alto_rischio_banca_italia": true,
+      "fonte_rischio": "Banca d'Italia e UIF: commercio al dettaglio, autoriparazioni e compro-oro/gioiellerie (ricompresi in questo ramo) presentano alta intensita di contante e rientrano tra i settori attenzionati per adeguata verifica rafforzata"
+    },
+    {
+      "codice": "340",
+      "attivita": "Servizi degli alberghi e pubblici esercizi",
+      "rischio_indicativo": 3,
+      "rischio_indicativo_label": "abbastanza significativo",
+      "alto_rischio_banca_italia": true,
+      "fonte_rischio": "Banca d'Italia (direttiva 30/07/2019) e UIF: ristorazione, bar, alberghi e pubblici esercizi con forte intensita di contante, rischio di sotto-dichiarazione ricavi e uso come veicolo di riciclaggio"
+    },
+    {
+      "codice": "360",
+      "attivita": "Servizi dei trasporti interni",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Trasporto su strada/ferrovia prevalentemente B2B; attenzione al trasporto passeggeri e merci non tracciato"
+    },
+    {
+      "codice": "380",
+      "attivita": "Servizi dei trasporti marittimi ed aerei",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Settore regolamentato con transazioni tracciate; attenzione alla dimensione transfrontaliera e ai paesi ad alto rischio"
+    },
+    {
+      "codice": "400",
+      "attivita": "Servizi connessi ai trasporti",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Servizi logistici e ausiliari prevalentemente B2B; rischio medio-basso"
+    },
+    {
+      "codice": "420",
+      "attivita": "Servizi delle comunicazioni",
+      "rischio_indicativo": 1,
+      "rischio_indicativo_label": "non significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Telecomunicazioni e servizi postali, settore regolamentato con transazioni tracciate"
+    },
+    {
+      "codice": "440",
+      "attivita": "Altri servizi destinabili alla vendita",
+      "rischio_indicativo": 2,
+      "rischio_indicativo_label": "poco significativo",
+      "alto_rischio_banca_italia": false,
+      "fonte_rischio": "Aggregato eterogeneo che include servizi professionali, consulenziali, immobiliari e altri; valutare caso per caso. ATTENZIONE: attivita immobiliari, gestione fiduciaria e servizi professionali (se ricompresi) sono settori ad alto rischio per EU SNRA e D.Lgs. 231/2007"
+    }
+  ]
+}
